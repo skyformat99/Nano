@@ -614,10 +614,9 @@ ssize_t do_replace_loop(const char *needle, bool whole_word_only,
 	    numreplaced = 0;
 
 	if (!replaceall) {
-	    size_t xpt = xplustabs();
-	    char *exp_word = display_string(openfile->current->data,
-			xpt, strnlenpt(openfile->current->data,
-			openfile->current_x + match_len) - xpt, FALSE);
+	    size_t from_col = xplustabs();
+	    size_t to_col = strnlenpt(openfile->current->data,
+					openfile->current_x + match_len);
 
 	    /* Refresh the edit window, scrolling it if necessary. */
 	    edit_refresh();
@@ -625,14 +624,12 @@ ssize_t do_replace_loop(const char *needle, bool whole_word_only,
 	    /* Don't show cursor, to not distract from highlighted match. */
 	    curs_set(0);
 
-	    spotlight(TRUE, exp_word);
+	    spotlight(TRUE, from_col, to_col);
 
 	    /* TRANSLATORS: This is a prompt. */
 	    i = do_yesno_prompt(TRUE, _("Replace this instance?"));
 
-	    spotlight(FALSE, exp_word);
-
-	    free(exp_word);
+	    spotlight(FALSE, from_col, to_col);
 
 	    if (i == -1)  /* The replacing was cancelled. */
 		break;
@@ -859,10 +856,10 @@ void do_gotolinecolumn(ssize_t line, ssize_t column, bool use_answer,
 	    return;
 	}
     } else {
-	if (line < 1)
+	if (line == 0)
 	    line = openfile->current->lineno;
 
-	if (column < 1)
+	if (column == 0)
 	    column = openfile->placewewant + 1;
     }
 
@@ -903,7 +900,7 @@ void do_gotolinecolumn(ssize_t line, ssize_t column, bool use_answer,
 #ifndef NANO_TINY
 	if (ISSET(SOFTWRAP)) {
 	    filestruct *line = openfile->current;
-	    size_t leftedge = (xplustabs() / editwincols) * editwincols;
+	    size_t leftedge = leftedge_for(xplustabs(), openfile->current);
 
 	    rows_from_tail = (editwinrows / 2) -
 			go_forward_chunks(editwinrows / 2, &line, &leftedge);

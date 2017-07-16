@@ -1,4 +1,13 @@
-2017.05.21 - GNU nano 2.8.4 includes the nanorc man page again.
+2017.06.25 - GNU nano 2.8.5 "Farouche" avoids a crash when waking from
+		a suspension that was induced from the outside, allows
+		negative line and column numbers on the command line,
+		avoids some flickering when resizing the screen while
+		in the file browser, opens files in the order they were
+		mentioned on the command line, and does not pretend to
+		have woken from suspension when receiving a SIGCONT.
+
+2017.05.21 - GNU nano 2.8.4 "Our Version of Events" includes the nanorc
+		man page again.
 
 2017.05.18 - GNU nano 2.8.3 "Hirsch" fixes a misplacement of the spotlight
 		during interactive replacing, avoids build failures on AIX
@@ -572,7 +581,7 @@
 		compiling on AIX, and a segfault when making the terminal
 		window too small.  Rest in Peace Tim and George!
 
-2008.04.01 - GNU nano 2.1.1 wont get fooled again.  This release contains
+2008.04.01 - GNU nano 2.1.1 won't get fooled again.  This release contains
 		fixes for the new user-rebindable keys (in particular
 		bracket match which was mis-bound), and various
 		problems with translations and configure-related
@@ -737,7 +746,7 @@
 		focuses mostly on bugfixes, which include better
 		handling of the cursor at the statusbar prompt, support
 		for certain combinations of Shift and keypad keys in
-		both normal and --rebind-keypad mode, a fix for a minor
+		both normal and --rebindkeypad mode, a fix for a minor
 		display problem after some searches, a real fix for a
 		long-standing segfault when displaying overly long
 		lines, and a real fix for nano's not hanging up properly

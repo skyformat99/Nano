@@ -59,6 +59,9 @@ static struct termios oldterm;
 static struct sigaction act;
 	/* Used to set up all our fun signal handlers. */
 
+static bool input_was_aborted = FALSE;
+	/* Whether reading from standard input was aborted via ^C. */
+
 /* Create a new linestruct node.  Note that we do not set prevnode->next
  * to the new line. */
 filestruct *make_new_node(filestruct *prevnode)
@@ -777,7 +780,7 @@ void usage(void)
      * It's best to keep its lines within 80 characters. */
     printf(_("To place the cursor on a specific line of a file, put the line number with\n"
 		"a '+' before the filename.  The column number can be added after a comma.\n"));
-    printf(_("When the first filename is '-', nano reads data from standard input.\n\n"));
+    printf(_("When a filename is '-', nano reads data from standard input.\n\n"));
     printf(_("Option\t\tGNU long option\t\tMeaning\n"));
 #ifndef NANO_TINY
     print_opt("-A", "--smarthome",
@@ -848,6 +851,9 @@ void usage(void)
 	print_opt(_("-Y <name>"), _("--syntax=<name>"),
 		N_("Syntax definition to use for coloring"));
 #endif
+#ifndef NANO_TINY
+    print_opt("-a", "--atblanks", N_("When soft-wrapping, do it at whitespace"));
+#endif
     print_opt("-c", "--constantshow", N_("Constantly show cursor position"));
     print_opt("-d", "--rebinddelete",
 	N_("Fix Backspace/Delete confusion problem"));
@@ -858,7 +864,7 @@ void usage(void)
     print_opt("-h", "--help", N_("Show this help text and exit"));
 #ifndef NANO_TINY
     print_opt("-i", "--autoindent", N_("Automatically indent new lines"));
-    print_opt("-k", "--cut", N_("Cut from cursor to end of line"));
+    print_opt("-k", "--cutfromcursor", N_("Cut from cursor to end of line"));
 #endif
 #ifdef ENABLE_LINENUMBERS
     print_opt("-l", "--linenumbers", N_("Show line numbers in front of the text"));
@@ -1100,29 +1106,26 @@ void do_cancel(void)
     ;
 }
 
-static struct sigaction pager_oldaction, pager_newaction;
-	/* Original and temporary handlers for SIGINT. */
-static bool pager_sig_failed = FALSE;
-	/* Did sigaction() fail without changing the signal handlers? */
-static bool pager_input_aborted = FALSE;
-	/* Did someone invoke the pager and abort it via ^C? */
-
-/* Cancel reading from stdin like a pager. */
-RETSIGTYPE cancel_stdin_pager(int signal)
+/* Make a note that reading from stdin was concluded with ^C. */
+RETSIGTYPE make_a_note(int signal)
 {
-    pager_input_aborted = TRUE;
+    input_was_aborted = TRUE;
 }
 
-/* Let nano read stdin for the first file at least. */
-void stdin_pager(void)
+/* Read whatever comes from standard input into a new buffer. */
+bool scoop_stdin(void)
 {
+    struct sigaction oldaction, newaction;
+	/* Original and temporary handlers for SIGINT. */
+    bool setup_failed = FALSE;
+	/* Whether setting up the SIGINT handler failed. */
     FILE *stream;
     int thetty;
 
+    /* Exit from curses mode and put the terminal into its original state. */
     endwin();
+    tcsetattr(0, TCSANOW, &oldterm);
 
-    if (!pager_input_aborted)
-	tcsetattr(0, TCSANOW, &oldterm);
     fprintf(stderr, _("Reading from stdin, ^C to abort\n"));
 
 #ifndef NANO_TINY
@@ -1131,14 +1134,14 @@ void stdin_pager(void)
     enable_signals();
 #endif
 
-    /* Set things up so that SIGINT will cancel the new process. */
-    if (sigaction(SIGINT, NULL, &pager_newaction) == -1) {
-	pager_sig_failed = TRUE;
+    /* Set things up so that SIGINT will cancel the reading. */
+    if (sigaction(SIGINT, NULL, &newaction) == -1) {
+	setup_failed = TRUE;
 	nperror("sigaction");
     } else {
-	pager_newaction.sa_handler = cancel_stdin_pager;
-	if (sigaction(SIGINT, &pager_newaction, &pager_oldaction) == -1) {
-	    pager_sig_failed = TRUE;
+	newaction.sa_handler = make_a_note;
+	if (sigaction(SIGINT, &newaction, &oldaction) == -1) {
+	    setup_failed = TRUE;
 	    nperror("sigaction");
 	}
     }
@@ -1151,7 +1154,7 @@ void stdin_pager(void)
 	terminal_init();
 	doupdate();
 	statusline(ALERT, _("Failed to open stdin: %s"), strerror(errnumber));
-	return;
+	return FALSE;
     }
 
     /* Read the input into a new buffer. */
@@ -1166,14 +1169,21 @@ void stdin_pager(void)
     dup2(thetty, 0);
     close(thetty);
 
-    if (!pager_input_aborted)
+    /* If things went well, store the current state of the terminal. */
+    if (!input_was_aborted)
 	tcgetattr(0, &oldterm);
-    if (!pager_sig_failed && sigaction(SIGINT, &pager_oldaction, NULL) == -1)
+
+    /* If it was changed, restore the handler for SIGINT. */
+    if (!setup_failed && sigaction(SIGINT, &oldaction, NULL) == -1)
 	nperror("sigaction");
 
     terminal_init();
     doupdate();
-    set_modified();
+
+    if (!ISSET(VIEW_MODE) && openfile->totsize > 0)
+	set_modified();
+
+    return TRUE;
 }
 
 /* Register half a dozen signal handlers. */
@@ -1278,7 +1288,7 @@ RETSIGTYPE do_continue(int signal)
     terminal_init();
 #endif
     /* Tickle the input routine so it will update the screen. */
-    ungetch(KEY_F0);
+    ungetch(KEY_FLUSH);
 }
 
 #ifndef NANO_TINY
@@ -1677,7 +1687,7 @@ int do_input(bool allow_funcs)
 #ifndef NANO_TINY
 	if (s->scfunc == do_toggle_void) {
 	    do_toggle(s->toggle);
-	    if (s->toggle != CUT_TO_END)
+	    if (s->toggle != CUT_FROM_CURSOR)
 		preserve = TRUE;
 	} else
 #endif
@@ -1752,7 +1762,7 @@ int do_mouse(void)
 	    /* Whether the click was on the row where the cursor is. */
 
 	if (ISSET(SOFTWRAP))
-	    leftedge = (xplustabs() / editwincols) * editwincols;
+	    leftedge = leftedge_for(xplustabs(), openfile->current);
 	else
 #endif
 	    leftedge = get_page_start(xplustabs());
@@ -1768,7 +1778,7 @@ int do_mouse(void)
 	    go_forward_chunks(row_count, &openfile->current, &leftedge);
 
 	openfile->current_x = actual_x(openfile->current->data,
-					leftedge + mouse_col);
+				actual_last_column(leftedge, mouse_col));
 
 #ifndef NANO_TINY
 	/* Clicking where the cursor is toggles the mark, as does clicking
@@ -1798,12 +1808,12 @@ void do_output(char *output, size_t output_len, bool allow_cntrls)
     size_t current_len = strlen(openfile->current->data);
     size_t i = 0;
 #ifndef NANO_TINY
-    size_t orig_rows = 0, original_row = 0;
+    size_t original_row = 0, old_amount = 0;
 
     if (ISSET(SOFTWRAP)) {
 	if (openfile->current_y == editwinrows - 1)
-	    original_row = xplustabs() / editwincols;
-	orig_rows = strlenpt(openfile->current->data) / editwincols;
+	    original_row = chunk_for(xplustabs(), openfile->current);
+	old_amount = number_of_chunks_in(openfile->current);
     }
 #endif
 
@@ -1868,9 +1878,9 @@ void do_output(char *output, size_t output_len, bool allow_cntrls)
      * of the edit window, and we moved one screen row, we're now below
      * the last line of the edit window, so we need a full refresh too. */
     if (ISSET(SOFTWRAP) && refresh_needed == FALSE &&
-		(strlenpt(openfile->current->data) / editwincols != orig_rows ||
+		(number_of_chunks_in(openfile->current) != old_amount ||
 		(openfile->current_y == editwinrows - 1 &&
-		xplustabs() / editwincols != original_row)))
+		chunk_for(xplustabs(), openfile->current) != original_row)))
 	refresh_needed = TRUE;
 #endif
 
@@ -1896,9 +1906,9 @@ int main(int argc, char **argv)
 #endif
 #endif
 #ifdef ENABLE_MULTIBUFFER
-    bool old_multibuffer;
-	/* The old value of the multibuffer option, restored after we
-	 * load all files on the command line. */
+    bool is_multibuffer;
+	/* The actual value of the multibuffer option, restored after
+	 * we've loaded all files given on the command line. */
 #endif
     const struct option long_options[] = {
 	{"boldtext", 0, NULL, 'D'},
@@ -1965,8 +1975,9 @@ int main(int argc, char **argv)
 	{"smooth", 0, NULL, 'S'},
 	{"wordbounds", 0, NULL, 'W'},
 	{"wordchars", 1, NULL, 'X'},
+	{"atblanks", 0, NULL, 'a'},
 	{"autoindent", 0, NULL, 'i'},
-	{"cut", 0, NULL, 'k'},
+	{"cutfromcursor", 0, NULL, 'k'},
 	{"unix", 0, NULL, 'u'},
 	{"softwrap", 0, NULL, '$'},
 #endif
@@ -2017,7 +2028,6 @@ int main(int argc, char **argv)
 		"ABC:DEFGHIKLNOPQ:RST:UVWX:Y:abcdefghijklmno:pqr:s:tuvwxz$",
 		long_options, NULL)) != -1) {
 	switch (optchr) {
-	    case 'a':
 	    case 'b':
 	    case 'e':
 	    case 'f':
@@ -2121,6 +2131,11 @@ int main(int argc, char **argv)
 		syntaxstr = mallocstrcpy(syntaxstr, optarg);
 		break;
 #endif
+#ifndef NANO_TINY
+	    case 'a':
+		SET(AT_BLANKS);
+		break;
+#endif
 	    case 'c':
 		SET(CONSTANT_SHOW);
 		break;
@@ -2135,7 +2150,7 @@ int main(int argc, char **argv)
 		SET(AUTOINDENT);
 		break;
 	    case 'k':
-		SET(CUT_TO_END);
+		SET(CUT_FROM_CURSOR);
 		break;
 #endif
 #ifdef ENABLE_MOUSE
@@ -2421,13 +2436,12 @@ int main(int argc, char **argv)
     if (matchbrackets == NULL)
 	matchbrackets = mallocstrcpy(NULL, "(<[{)>]}");
 
-    /* If whitespace wasn't specified, set its default value.  If we're
-     * using UTF-8, it's Unicode 00BB (Right-Pointing Double Angle
-     * Quotation Mark) and Unicode 00B7 (Middle Dot).  Otherwise, it's
-     * ">" and ".". */
+    /* If the whitespace option wasn't specified, set its default value. */
     if (whitespace == NULL) {
 #ifdef ENABLE_UTF8
 	if (using_utf8()) {
+	    /* A tab is shown as a Right-Pointing Double Angle Quotation Mark
+	     * (U+00BB), and a space as a Middle Dot (U+00B7). */
 	    whitespace = mallocstrcpy(NULL, "\xC2\xBB\xC2\xB7");
 	    whitespace_len[0] = 2;
 	    whitespace_len[1] = 2;
@@ -2464,8 +2478,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "Main: set up windows\n");
 #endif
 
-    /* Initialize all the windows based on the current screen
-     * dimensions. */
+    /* Create the three subwindows, based on the current screen dimensions. */
     window_init();
 
     editwincols = COLS;
@@ -2521,18 +2534,12 @@ int main(int argc, char **argv)
     fprintf(stderr, "Main: open file\n");
 #endif
 
-    /* If one of the arguments is a dash, read text from standard input. */
-    if (optind < argc && !strcmp(argv[optind], "-")) {
-	stdin_pager();
-	optind++;
-    }
-
 #ifdef ENABLE_MULTIBUFFER
-    old_multibuffer = ISSET(MULTIBUFFER);
+    is_multibuffer = ISSET(MULTIBUFFER);
     SET(MULTIBUFFER);
 #endif
 
-    /* Read the named files on the command line into new buffers. */
+    /* Read the files mentioned on the command line into new buffers. */
     while (optind < argc && (!openfile || ISSET(MULTIBUFFER))) {
 	ssize_t givenline = 0, givencol = 0;
 
@@ -2542,15 +2549,20 @@ int main(int argc, char **argv)
 		statusline(ALERT, _("Invalid line or column number"));
 	}
 
-	/* If opening fails, don't try to position the cursor. */
-	if (!open_buffer(argv[optind++], FALSE))
+	/* If the filename is a dash, read from standard input; otherwise,
+	 * open the file; skip positioning the cursor if either failed. */
+	if (strcmp(argv[optind], "-") == 0) {
+	    if (!scoop_stdin())
+		continue;
+	    optind++;
+	} else if (!open_buffer(argv[optind++], FALSE))
 	    continue;
 
 	/* If a position was given on the command line, go there. */
-	if (givenline > 0 || givencol > 0)
+	if (givenline != 0 || givencol != 0)
 	    do_gotolinecolumn(givenline, givencol, FALSE, FALSE);
 #ifndef DISABLE_HISTORIES
-	else if (ISSET(POS_HISTORY)) {
+	else if (ISSET(POS_HISTORY) && openfile->filename[0] != '\0') {
 	    ssize_t savedline, savedcol;
 	    /* If edited before, restore the last cursor position. */
 	    if (has_old_position(argv[optind - 1], &savedline, &savedcol))
@@ -2565,11 +2577,12 @@ int main(int argc, char **argv)
     if (openfile == NULL) {
 	open_buffer("", FALSE);
 	UNSET(VIEW_MODE);
-    } else
+    }
+#ifdef ENABLE_MULTIBUFFER
+    else
 	openfile = openfile->next;
 
-#ifdef ENABLE_MULTIBUFFER
-    if (!old_multibuffer)
+    if (!is_multibuffer)
 	UNSET(MULTIBUFFER);
 #endif
 
@@ -2583,7 +2596,7 @@ int main(int argc, char **argv)
 #ifdef ENABLE_LINENUMBERS
 	int needed_margin = digits(openfile->filebot->lineno) + 1;
 
-	/* Only enable line numbers when there is enough room for them. */
+	/* Suppress line numbers when there is not enough room for them. */
 	if (!ISSET(LINE_NUMBERS) || needed_margin > COLS - 4)
 	    needed_margin = 0;
 

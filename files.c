@@ -21,10 +21,10 @@
 
 #include "proto.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <utime.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
@@ -631,9 +631,14 @@ void switch_to_prevnext_buffer(bool to_next)
     /* Update titlebar and multiline info to match the current buffer. */
     prepare_for_display();
 
+    if (inhelp)
+	return;
+
+    /* Ensure that the main loop will redraw the help lines. */
+    currmenu = MMOST;
+
     /* Indicate the switch on the statusbar. */
-    if (!inhelp)
-	statusline(HUSH, _("Switched to %s"),
+    statusline(HUSH, _("Switched to %s"),
 			((openfile->filename[0] == '\0') ?
 			_("New Buffer") : openfile->filename));
 
@@ -677,7 +682,7 @@ bool close_buffer(void)
     /* Close the file buffer we had open before. */
     unlink_opennode(openfile->prev);
 
-    /* If only one buffer is open now, show Exit in the help lines. */
+    /* If now just one buffer remains open, show "Exit" in the help lines. */
     if (openfile == openfile->next)
 	exitfunc->desc = exit_tag;
 
@@ -777,7 +782,7 @@ void read_file(FILE *f, int fd, const char *filename, bool undoable,
 	add_undo(INSERT);
 
     if (ISSET(SOFTWRAP))
-	was_leftedge = (xplustabs() / editwincols) * editwincols;
+	was_leftedge = leftedge_for(xplustabs(), openfile->current);
 #endif
 
     /* Create an empty buffer. */
@@ -1987,6 +1992,7 @@ bool write_file(const char *name, FILE *f_open, bool tmp,
 	/* If we must set the filename, and it changed, adjust things. */
 	if (!nonamechange && strcmp(openfile->filename, realname) != 0) {
 #ifndef DISABLE_COLOR
+	    char *newname;
 	    char *oldname = openfile->syntax ? openfile->syntax->name : "";
 	    filestruct *line = openfile->fileage;
 #endif
@@ -1997,7 +2003,7 @@ bool write_file(const char *name, FILE *f_open, bool tmp,
 	    color_update();
 	    color_init();
 
-	    char *newname = openfile->syntax ? openfile->syntax->name : "";
+	    newname = openfile->syntax ? openfile->syntax->name : "";
 
 	    /* If the syntax changed, discard and recompute the multidata. */
 	    if (strcmp(oldname, newname) != 0) {
@@ -2284,6 +2290,8 @@ int do_writeout(bool exiting)
 			openfile->current_stat->st_dev != st.st_dev ||
 			openfile->current_stat->st_ino != st.st_ino)) {
 
+		    warn_and_shortly_pause(_("File on disk has changed"));
+
 		    if (do_yesno_prompt(FALSE, _("File was modified since "
 				"you opened it; continue saving? ")) < 1)
 			continue;
@@ -2455,14 +2463,15 @@ char **username_tab_completion(const char *buf, size_t *num_matches,
 	size_t buf_len)
 {
     char **matches = NULL;
+#ifdef HAVE_PWD_H
+    const struct passwd *userdata;
+#endif
 
     assert(buf != NULL && num_matches != NULL && buf_len > 0);
 
     *num_matches = 0;
 
 #ifdef HAVE_PWD_H
-    const struct passwd *userdata;
-
     while ((userdata = getpwent()) != NULL) {
 	if (strncmp(userdata->pw_name, buf + 1, buf_len - 1) == 0) {
 	    /* Cool, found a match.  Add it to the list.  This makes a
