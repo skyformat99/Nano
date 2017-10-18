@@ -22,18 +22,12 @@
 #include "proto.h"
 
 #include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <errno.h>
+#ifdef DEBUG
 #include <time.h>
+#endif
 
 static bool came_full_circle = FALSE;
 	/* Have we reached the starting line again while searching? */
-#ifndef DISABLE_HISTORIES
-static bool history_changed = FALSE;
-	/* Have any of the history lists changed? */
-#endif
 static bool regexp_compiled = FALSE;
 	/* Have we compiled any regular expressions? */
 
@@ -71,21 +65,14 @@ void regexp_cleanup(void)
     }
 }
 
-/* Indicate on the statusbar that the string at str was not found by the
- * last search. */
+/* Report on the status bar that the given string was not found. */
 void not_found_msg(const char *str)
 {
-    char *disp;
-    int numchars;
-
-    assert(str != NULL);
-
-    disp = display_string(str, 0, (COLS / 2) + 1, FALSE);
-    numchars = actual_x(disp, mbstrnlen(disp, COLS / 2));
+    char *disp = display_string(str, 0, (COLS / 2) + 1, FALSE);
+    size_t numchars = actual_x(disp, strnlenpt(disp, COLS / 2));
 
     statusline(HUSH, _("\"%.*s%s\" not found"), numchars, disp,
 		(disp[numchars] == '\0') ? "" : "...");
-
     free(disp);
 }
 
@@ -387,6 +374,20 @@ void do_search(void)
 	go_looking();
 }
 
+/* Search forward for a string. */
+void do_search_forward(void)
+{
+    UNSET(BACKWARDS_SEARCH);
+    do_search();
+}
+
+/* Search backwards for a string. */
+void do_search_backward(void)
+{
+    SET(BACKWARDS_SEARCH);
+    do_search();
+}
+
 #ifndef NANO_TINY
 /* Search in the backward direction for the next occurrence. */
 void do_findprevious(void)
@@ -461,7 +462,7 @@ void go_looking(void)
     statusline(HUSH, "Took: %.2f", (double)(clock() - start) / CLOCKS_PER_SEC);
 #endif
 
-    edit_redraw(was_current);
+    edit_redraw(was_current, CENTERING);
     search_replace_abort();
 }
 
@@ -620,9 +621,6 @@ ssize_t do_replace_loop(const char *needle, bool whole_word_only,
 
 	    /* Refresh the edit window, scrolling it if necessary. */
 	    edit_refresh();
-
-	    /* Don't show cursor, to not distract from highlighted match. */
-	    curs_set(0);
 
 	    spotlight(TRUE, from_col, to_col);
 
@@ -912,7 +910,7 @@ void do_gotolinecolumn(ssize_t line, ssize_t column, bool use_answer,
 	/* If the target line is close to the tail of the file, put the last
 	 * line or chunk on the bottom line of the screen; otherwise, just
 	 * center the target line. */
-	if (rows_from_tail < editwinrows / 2) {
+	if (rows_from_tail < editwinrows / 2 && ISSET(SMOOTH_SCROLL)) {
 	    openfile->current_y = editwinrows - 1 - rows_from_tail;
 	    adjust_viewport(STATIONARY);
 	} else
@@ -1075,8 +1073,7 @@ void do_find_bracket(void)
 	    /* If count is zero, we've found a matching bracket.  Update
 	     * the screen and get out. */
 	    if (count == 0) {
-		focusing = FALSE;
-		edit_redraw(current_save);
+		edit_redraw(current_save, FLOWING);
 		break;
 	    }
 	} else {
@@ -1090,199 +1087,3 @@ void do_find_bracket(void)
     }
 }
 #endif /* !NANO_TINY */
-
-#ifndef DISABLE_HISTORIES
-/* Indicate whether any of the history lists have changed. */
-bool history_has_changed(void)
-{
-    return history_changed;
-}
-
-/* Initialize the search and replace history lists. */
-void history_init(void)
-{
-    search_history = make_new_node(NULL);
-    search_history->data = mallocstrcpy(NULL, "");
-    searchage = search_history;
-    searchbot = search_history;
-
-    replace_history = make_new_node(NULL);
-    replace_history->data = mallocstrcpy(NULL, "");
-    replaceage = replace_history;
-    replacebot = replace_history;
-}
-
-/* Set the current position in the history list h to the bottom. */
-void history_reset(const filestruct *h)
-{
-    if (h == search_history)
-	search_history = searchbot;
-    else if (h == replace_history)
-	replace_history = replacebot;
-}
-
-/* Return the first node containing the first len characters of the
- * string s in the history list, starting at h_start and ending at
- * h_end, or NULL if there isn't one. */
-filestruct *find_history(const filestruct *h_start, const filestruct
-	*h_end, const char *s, size_t len)
-{
-    const filestruct *p;
-
-    for (p = h_start; p != h_end->prev && p != NULL; p = p->prev) {
-	if (strncmp(s, p->data, len) == 0)
-	    return (filestruct *)p;
-    }
-
-    return NULL;
-}
-
-/* Update a history list (the one in which h is the current position)
- * with a fresh string s.  That is: add s, or move it to the end. */
-void update_history(filestruct **h, const char *s)
-{
-    filestruct **hage = NULL, **hbot = NULL, *thesame;
-
-    assert(h != NULL && s != NULL);
-
-    if (*h == search_history) {
-	hage = &searchage;
-	hbot = &searchbot;
-    } else if (*h == replace_history) {
-	hage = &replaceage;
-	hbot = &replacebot;
-    }
-
-    assert(hage != NULL && hbot != NULL);
-
-    /* See if the string is already in the history. */
-    thesame = find_history(*hbot, *hage, s, HIGHEST_POSITIVE);
-
-    /* If an identical string was found, delete that item. */
-    if (thesame != NULL) {
-	filestruct *after = thesame->next;
-
-	/* If the string is at the head of the list, move the head. */
-	if (thesame == *hage)
-	    *hage = after;
-
-	unlink_node(thesame);
-	renumber(after);
-    }
-
-    /* If the history is full, delete the oldest item (the one at the
-     * head of the list), to make room for a new item at the end. */
-    if ((*hbot)->lineno == MAX_SEARCH_HISTORY + 1) {
-	filestruct *oldest = *hage;
-
-	*hage = (*hage)->next;
-	unlink_node(oldest);
-	renumber(*hage);
-    }
-
-    /* Store the fresh string in the last item, then create a new item. */
-    (*hbot)->data = mallocstrcpy((*hbot)->data, s);
-    splice_node(*hbot, make_new_node(*hbot));
-    *hbot = (*hbot)->next;
-    (*hbot)->data = mallocstrcpy(NULL, "");
-
-    /* Indicate that the history needs to be saved on exit. */
-    history_changed = TRUE;
-
-    /* Set the current position in the list to the bottom. */
-    *h = *hbot;
-}
-
-/* Move h to the string in the history list just before it, and return
- * that string.  If there isn't one, don't move h and return NULL. */
-char *get_history_older(filestruct **h)
-{
-    assert(h != NULL);
-
-    if ((*h)->prev == NULL)
-	return NULL;
-
-    *h = (*h)->prev;
-
-    return (*h)->data;
-}
-
-/* Move h to the string in the history list just after it, and return
- * that string.  If there isn't one, don't move h and return NULL. */
-char *get_history_newer(filestruct **h)
-{
-    assert(h != NULL);
-
-    if ((*h)->next == NULL)
-	return NULL;
-
-    *h = (*h)->next;
-
-    return (*h)->data;
-}
-
-/* More placeholders. */
-void get_history_newer_void(void)
-{
-    ;
-}
-void get_history_older_void(void)
-{
-    ;
-}
-
-#ifdef ENABLE_TABCOMP
-/* Move h to the next string that's a tab completion of the string s,
- * looking at only the first len characters of s, and return that
- * string.  If there isn't one, or if len is 0, don't move h and return
- * s. */
-char *get_history_completion(filestruct **h, char *s, size_t len)
-{
-    assert(s != NULL);
-
-    if (len > 0) {
-	filestruct *hage = NULL, *hbot = NULL, *p;
-
-	assert(h != NULL);
-
-	if (*h == search_history) {
-	    hage = searchage;
-	    hbot = searchbot;
-	} else if (*h == replace_history) {
-	    hage = replaceage;
-	    hbot = replacebot;
-	}
-
-	assert(hage != NULL && hbot != NULL);
-
-	/* Search the history list from the current position to the top
-	 * for a match of len characters.  Skip over an exact match. */
-	p = find_history((*h)->prev, hage, s, len);
-
-	while (p != NULL && strcmp(p->data, s) == 0)
-	    p = find_history(p->prev, hage, s, len);
-
-	if (p != NULL) {
-	    *h = p;
-	    return mallocstrcpy(s, (*h)->data);
-	}
-
-	/* Search the history list from the bottom to the current position
-	 * for a match of len characters.  Skip over an exact match. */
-	p = find_history(hbot, *h, s, len);
-
-	while (p != NULL && strcmp(p->data, s) == 0)
-	    p = find_history(p->prev, *h, s, len);
-
-	if (p != NULL) {
-	    *h = p;
-	    return mallocstrcpy(s, (*h)->data);
-	}
-    }
-
-    /* If we're here, we didn't find a match, we didn't find an inexact
-     * match, or len is 0.  Return s. */
-    return (char *)s;
-}
-#endif /* ENSABLE_TABCOMP */
-#endif /* !DISABLE_HISTORIES */

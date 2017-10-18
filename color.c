@@ -21,14 +21,12 @@
 
 #include "proto.h"
 
-#include <stdio.h>
-#include <string.h>
 #include <errno.h>
-#include <unistd.h>
-
 #ifdef HAVE_MAGIC_H
 #include <magic.h>
 #endif
+#include <string.h>
+#include <unistd.h>
 
 #ifndef DISABLE_COLOR
 
@@ -127,9 +125,6 @@ void color_init(void)
 	    background = COLOR_BLACK;
 
 	init_pair(ink->pairnum, foreground, background);
-#ifdef DEBUG
-	fprintf(stderr, "init_pair(): fg = %hd, bg = %hd\n", foreground, background);
-#endif
     }
 
     have_palette = TRUE;
@@ -177,13 +172,13 @@ void color_update(void)
 		break;
 	}
 
-	if (sint == NULL)
+	if (sint == NULL && !inhelp)
 	    statusline(ALERT, _("Unknown syntax name: %s"), syntaxstr);
     }
 
     /* If no syntax-override string was specified, or it didn't match,
      * try finding a syntax based on the filename (extension). */
-    if (sint == NULL) {
+    if (sint == NULL && !inhelp) {
 	char *reserved = charalloc(PATH_MAX + 1);
 	char *currentdir = getcwd(reserved, PATH_MAX + 1);
 	char *joinednames = charalloc(PATH_MAX + 1);
@@ -212,10 +207,7 @@ void color_update(void)
     }
 
     /* If the filename didn't match anything, try the first line. */
-    if (sint == NULL) {
-#ifdef DEBUG
-	fprintf(stderr, "No result from file extension, trying headerline...\n");
-#endif
+    if (sint == NULL && !inhelp) {
 	for (sint = syntaxes; sint != NULL; sint = sint->next) {
 	    if (found_in_list(sint->headers, openfile->fileage->data))
 		break;
@@ -224,13 +216,11 @@ void color_update(void)
 
 #ifdef HAVE_LIBMAGIC
     /* If we still don't have an answer, try using magic. */
-    if (sint == NULL) {
+    if (sint == NULL && !inhelp) {
 	struct stat fileinfo;
 	magic_t cookie = NULL;
 	const char *magicstring = NULL;
-#ifdef DEBUG
-	fprintf(stderr, "No result from headerline either, trying libmagic...\n");
-#endif
+
 	if (stat(openfile->filename, &fileinfo) == 0) {
 	    /* Open the magic database and get a diagnosis of the file. */
 	    cookie = magic_open(MAGIC_SYMLINK |
@@ -245,9 +235,6 @@ void color_update(void)
 		if (magicstring == NULL)
 		    statusline(ALERT, _("magic_file(%s) failed: %s"),
 				openfile->filename, magic_error(cookie));
-#ifdef DEBUG
-		fprintf(stderr, "Returned magic string is: %s\n", magicstring);
-#endif
 	    }
 	}
 
@@ -265,7 +252,7 @@ void color_update(void)
 #endif /* HAVE_LIBMAGIC */
 
     /* If nothing at all matched, see if there is a default syntax. */
-    if (sint == NULL) {
+    if (sint == NULL && !inhelp) {
 	for (sint = syntaxes; sint != NULL; sint = sint->next) {
 	    if (strcmp(sint->name, "default") == 0)
 		break;

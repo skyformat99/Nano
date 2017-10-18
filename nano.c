@@ -22,24 +22,22 @@
 #include "proto.h"
 #include "revision.h"
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <ctype.h>
-#include <locale.h>
-#ifdef ENABLE_UTF8
-#include <langinfo.h>
-#endif
-#ifdef HAVE_TERMIOS_H
-#include <termios.h>
-#endif
+#include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #ifndef NANO_TINY
 #include <sys/ioctl.h>
 #endif
+#ifdef ENABLE_UTF8
+#include <langinfo.h>
+#endif
+#include <locale.h>
+#include <string.h>
+#ifdef HAVE_TERMIOS_H
+#include <termios.h>
+#endif
+#include <unistd.h>
 
 #ifdef ENABLE_MOUSE
 static int oldinterval = -1;
@@ -509,6 +507,9 @@ void unlink_opennode(openfilestruct *fileptr)
 {
     assert(fileptr != fileptr->prev && fileptr != fileptr->next);
 
+    if (fileptr == firstfile)
+	firstfile = firstfile->next;
+
     fileptr->prev->next = fileptr->next;
     fileptr->next->prev = fileptr->prev;
 
@@ -564,6 +565,7 @@ void finish(void)
     tcsetattr(0, TCSANOW, &oldterm);
 
 #ifndef DISABLE_HISTORIES
+    /* If the user wants history persistence, write the relevant files. */
     if (ISSET(HISTORYLOG))
 	save_history();
     if (ISSET(POS_HISTORY)) {
@@ -1079,7 +1081,7 @@ void do_exit(void)
 
     /* If the user chose not to save, or if the user chose to save and
      * the save succeeded, we're ready to exit. */
-    if (i == 0 || (i == 1 && do_writeout(TRUE)))
+    if (i == 0 || (i == 1 && do_writeout(TRUE, TRUE) > 0))
 	close_and_go();
     else if (i != 1)
 	statusbar(_("Cancelled"));
@@ -1572,13 +1574,13 @@ int do_input(bool allow_funcs)
 	/* The input buffer for actual characters. */
     static size_t depth = 0;
 	/* The length of the input buffer. */
-    bool preserve = FALSE;
-	/* Whether to preserve the contents of the cutbuffer. */
+    bool retain_cuts = FALSE;
+	/* Whether to conserve the current contents of the cutbuffer. */
     const sc *s;
     bool have_shortcut;
 
-    /* Read in a keystroke. */
-    input = get_kbinput(edit);
+    /* Read in a keystroke, and show the cursor while waiting. */
+    input = get_kbinput(edit, VISIBLE);
 
 #ifndef NANO_TINY
     if (input == KEY_WINCH)
@@ -1591,7 +1593,7 @@ int do_input(bool allow_funcs)
 	if (do_mouse() == 1)
 	    /* The click was on a shortcut -- read in the character
 	     * that it was converted into. */
-	    input = get_kbinput(edit);
+	    input = get_kbinput(edit, BLIND);
 	else
 	    /* The click was invalid or has been handled -- get out. */
 	    return ERR;
@@ -1678,7 +1680,7 @@ int do_input(bool allow_funcs)
 		|| s->scfunc == do_copy_text || s->scfunc == do_cut_till_eof
 #endif
 		)
-	    preserve = TRUE;
+	    retain_cuts = TRUE;
 
 #ifdef ENABLE_WORDCOMPLETION
 	if (s->scfunc != complete_a_word)
@@ -1688,7 +1690,7 @@ int do_input(bool allow_funcs)
 	if (s->scfunc == do_toggle_void) {
 	    do_toggle(s->toggle);
 	    if (s->toggle != CUT_FROM_CURSOR)
-		preserve = TRUE;
+		retain_cuts = TRUE;
 	} else
 #endif
 	{
@@ -1723,22 +1725,11 @@ int do_input(bool allow_funcs)
 
     /* If we aren't cutting or copying text, and the key wasn't a toggle,
      * blow away the text in the cutbuffer upon the next cutting action. */
-    if (!preserve)
+    if (!retain_cuts)
 	cutbuffer_reset();
 
     return input;
 }
-
-void xon_complaint(void)
-{
-    statusbar(_("XON ignored, mumble mumble"));
-}
-
-void xoff_complaint(void)
-{
-    statusbar(_("XOFF ignored, mumble mumble"));
-}
-
 
 #ifdef ENABLE_MOUSE
 /* Handle a mouse click on the edit window or the shortcut list. */
@@ -1767,10 +1758,6 @@ int do_mouse(void)
 #endif
 	    leftedge = get_page_start(xplustabs());
 
-#ifdef DEBUG
-	fprintf(stderr, "mouse_row = %d, current_y = %ld\n", mouse_row, (long)openfile->current_y);
-#endif
-
 	/* Move current up or down to the row corresponding to mouse_row. */
 	if (row_count < 0)
 	    go_back_chunks(-row_count, &openfile->current, &leftedge);
@@ -1790,7 +1777,7 @@ int do_mouse(void)
 	    /* The cursor moved; clean the cutbuffer on the next cut. */
 	    cutbuffer_reset();
 
-	edit_redraw(current_save);
+	edit_redraw(current_save, CENTERING);
     }
 
     /* No more handling is needed. */
@@ -1857,6 +1844,15 @@ void do_output(char *output, size_t output_len, bool allow_cntrls)
 	if (openfile->mark_set && openfile->current == openfile->mark_begin &&
 		openfile->current_x < openfile->mark_begin_x)
 	    openfile->mark_begin_x += char_len;
+
+	/* When the cursor is on the top row and not on the first chunk
+	 * of a line, adding text there might change the preceding chunk
+	 * and thus require an adjustment of firstcolumn. */
+	if (openfile->current == openfile->edittop &&
+			openfile->firstcolumn > 0) {
+	    ensure_firstcolumn_is_aligned();
+	    refresh_needed = TRUE;
+	}
 #endif
 
 	openfile->current_x += char_len;
@@ -2354,22 +2350,25 @@ int main(int argc, char **argv)
 	UNSET(NO_WRAP);
 #endif
 
-    /* If we're using bold text instead of reverse video text, set it up
-     * now. */
+    /* If the user wants bold instead of reverse video for hilited text... */
     if (ISSET(BOLD_TEXT))
 	hilite_attribute = A_BOLD;
 
 #ifndef DISABLE_HISTORIES
-    /* Set up the search/replace history. */
+    /* Initialize the pointers for the Search/Replace/Execute histories. */
     history_init();
-    /* Verify that the home directory and ~/.nano subdir exist. */
+
+    /* If we need any of the history files, verify that the user's home
+     * directory and its .nano subdirctory exist. */
     if (ISSET(HISTORYLOG) || ISSET(POS_HISTORY)) {
 	get_homedir();
-	if (homedir == NULL || check_dotnano() == 0) {
+	if (homedir == NULL || !have_dotnano()) {
 	    UNSET(HISTORYLOG);
 	    UNSET(POS_HISTORY);
 	}
     }
+
+    /* If the user wants history persistence, read the relevant files. */
     if (ISSET(HISTORYLOG))
 	load_history();
     if (ISSET(POS_HISTORY))
@@ -2377,19 +2376,18 @@ int main(int argc, char **argv)
 #endif /* !DISABLE_HISTORIES */
 
 #ifndef NANO_TINY
-    /* Set up the backup directory (unless we're using restricted mode,
-     * in which case backups are disabled, since they would allow
-     * reading from or writing to files not specified on the command
-     * line).  This entails making sure it exists and is a directory, so
-     * that backup files will be saved there. */
-    if (!ISSET(RESTRICTED))
+    /* If backups are enabled and a backup directory was specified and
+     * we're not in restricted mode, make sure the path exists and is
+     * a directory, so that backup files can be saved there. */
+    if (ISSET(BACKUP_FILE) && backup_dir != NULL && !ISSET(RESTRICTED))
 	init_backup_dir();
 #endif
 
 #ifndef DISABLE_OPERATINGDIR
     /* Set up the operating directory.  This entails chdir()ing there,
      * so that file reads and writes will be based there. */
-    init_operating_dir();
+    if (operating_dir != NULL)
+	init_operating_dir();
 #endif
 
 #ifndef DISABLE_JUSTIFY
@@ -2457,6 +2455,7 @@ int main(int argc, char **argv)
 
     /* Initialize the search string. */
     last_search = mallocstrcpy(NULL, "");
+    UNSET(BACKWARDS_SEARCH);
 
     /* If tabsize wasn't specified, set its default value. */
     if (tabsize == -1)
@@ -2480,6 +2479,7 @@ int main(int argc, char **argv)
 
     /* Create the three subwindows, based on the current screen dimensions. */
     window_init();
+    curs_set(0);
 
     editwincols = COLS;
 
@@ -2496,6 +2496,7 @@ int main(int argc, char **argv)
 #else
     interface_color_pair[TITLE_BAR] = hilite_attribute;
     interface_color_pair[LINE_NUMBER] = hilite_attribute;
+    interface_color_pair[SELECTED_TEXT] = hilite_attribute;
     interface_color_pair[STATUS_BAR] = hilite_attribute;
     interface_color_pair[KEY_COMBO] = hilite_attribute;
     interface_color_pair[FUNCTION_TAG] = A_NORMAL;
@@ -2518,6 +2519,11 @@ int main(int argc, char **argv)
     /* Ask for the codes for Shift+Control+Home/End. */
     shiftcontrolhome = get_keycode("kHOM6", SHIFT_CONTROL_HOME);
     shiftcontrolend = get_keycode("kEND6", SHIFT_CONTROL_END);
+    /* Ask for the codes for Alt+Left/Right/Up/Down. */
+    altleft = get_keycode("kLFT3", ALT_LEFT);
+    altright = get_keycode("kRIT3", ALT_RIGHT);
+    altup = get_keycode("kUP3", ALT_UP);
+    altdown = get_keycode("kDN3", ALT_DOWN);
     /* Ask for the codes for Shift+Alt+Left/Right/Up/Down. */
     shiftaltleft = get_keycode("kLFT4", SHIFT_ALT_LEFT);
     shiftaltright = get_keycode("kRIT4", SHIFT_ALT_RIGHT);
@@ -2626,13 +2632,10 @@ int main(int argc, char **argv)
 
 	/* Refresh just the cursor position or the entire edit window. */
 	if (!refresh_needed) {
-	    place_the_cursor(TRUE);
+	    place_the_cursor();
 	    wnoutrefresh(edit);
 	} else
 	    edit_refresh();
-
-	/* Make sure the cursor is visible. */
-	curs_set(1);
 
 	focusing = TRUE;
 

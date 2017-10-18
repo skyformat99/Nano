@@ -22,15 +22,11 @@
 #include "proto.h"
 #include "revision.h"
 
+#include <ctype.h>
 #ifdef __linux__
 #include <sys/ioctl.h>
 #endif
-
-#include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
-#include <unistd.h>
-#include <ctype.h>
 
 #ifdef REVISION
 #define BRANDING REVISION
@@ -53,6 +49,69 @@ static int statusblank = 0;
 static bool seen_wide = FALSE;
 	/* Whether we've seen a multicolumn character in the current line. */
 #endif
+static bool reveal_cursor = FALSE;
+	/* Whether the cursor should be shown when waiting for input. */
+#ifndef NANO_TINY
+static bool recording = FALSE;
+	/* Whether we are in the process of recording a macro. */
+static int *macro_buffer = NULL;
+	/* A buffer where the recorded key codes are stored. */
+static size_t macro_length = 0;
+	/* The current length of the macro. */
+
+/* Add the given code to the macro buffer. */
+void add_to_macrobuffer(int code)
+{
+    macro_length++;
+    macro_buffer = (int*)nrealloc(macro_buffer, macro_length * sizeof(int));
+    macro_buffer[macro_length - 1] = code;
+}
+
+/* Remove the last key code plus any trailing Esc codes from macro buffer. */
+void snip_last_keystroke(void)
+{
+    macro_length--;
+    while (macro_length > 0 && macro_buffer[macro_length - 1] == '\x1b')
+	macro_length--;
+}
+
+/* Start or stop the recording of keystrokes. */
+void record_macro(void)
+{
+    recording = !recording;
+
+    if (recording) {
+	macro_length = 0;
+	statusbar(_("Recording a macro..."));
+    } else {
+	snip_last_keystroke();
+	statusbar(_("Stopped recording"));
+    }
+}
+
+/* Copy the stored sequence of codes into the regular key buffer,
+ * so they will be "executed" again. */
+void run_macro(void)
+{
+    size_t i;
+
+    if (recording) {
+	statusline(HUSH, _("Cannot run macro while recording"));
+	snip_last_keystroke();
+	return;
+    }
+
+    if (macro_length == 0)
+	return;
+
+    free(key_buffer);
+    key_buffer = (int *)nmalloc(macro_length * sizeof(int));
+    key_buffer_len = macro_length;
+
+    for (i = 0; i < macro_length; i++)
+	key_buffer[i] = macro_buffer[i];
+}
+#endif /* !NANO_TINY */
 
 /* Control character compatibility:
  *
@@ -113,7 +172,7 @@ static bool seen_wide = FALSE;
  * buffer is empty. */
 void get_key_buffer(WINDOW *win)
 {
-    int input;
+    int input = ERR;
     size_t errcount = 0;
 
     /* If the keystroke buffer isn't empty, get out. */
@@ -124,37 +183,33 @@ void get_key_buffer(WINDOW *win)
      * screen updates. */
     doupdate();
 
-    /* Read in the first character using whatever mode we're in. */
-    input = wgetch(win);
+    if (reveal_cursor)
+	curs_set(1);
 
-#ifndef NANO_TINY
-    if (the_window_resized) {
-	ungetch(input);
-	regenerate_screen();
-	input = KEY_WINCH;
-    }
-#endif
-
-    if (input == ERR && !waiting_mode)
-	return;
-
+    /* Read in the first keystroke using whatever mode we're in. */
     while (input == ERR) {
-	/* If we've failed to get a character MAX_BUF_SIZE times in a row,
-	 * assume our input source is gone and die gracefully.  We could
-	 * check if errno is set to EIO ("Input/output error") and die in
-	 * that case, but it's not always set properly.  Argh. */
-	if (++errcount == MAX_BUF_SIZE)
-	    die(_("Too many errors from stdin"));
+	input = wgetch(win);
 
 #ifndef NANO_TINY
 	if (the_window_resized) {
 	    regenerate_screen();
 	    input = KEY_WINCH;
-	    break;
 	}
 #endif
-	input = wgetch(win);
+	if (input == ERR && !waiting_mode) {
+	    curs_set(0);
+	    return;
+	}
+
+	/* If we've failed to get a character MAX_BUF_SIZE times in a row,
+	 * assume our input source is gone and die gracefully.  We could
+	 * check if errno is set to EIO ("Input/output error") and die in
+	 * that case, but it's not always set properly.  Argh. */
+	if (input == ERR && ++errcount == MAX_BUF_SIZE)
+	    die(_("Too many errors from stdin"));
     }
+
+    curs_set(0);
 
     /* Increment the length of the keystroke buffer, and save the value
      * of the keystroke at the end of it. */
@@ -173,6 +228,10 @@ void get_key_buffer(WINDOW *win)
     nodelay(win, TRUE);
 
     while (TRUE) {
+#ifndef NANO_TINY
+	if (recording)
+	    add_to_macrobuffer(input);
+#endif
 	input = wgetch(win);
 
 	/* If there aren't any more characters, stop reading. */
@@ -289,9 +348,11 @@ int *get_input(WINDOW *win, size_t input_len)
 }
 
 /* Read in a single keystroke, ignoring any that are invalid. */
-int get_kbinput(WINDOW *win)
+int get_kbinput(WINDOW *win, bool showcursor)
 {
     int kbinput = ERR;
+
+    reveal_cursor = showcursor;
 
     /* Extract one keystroke from the input stream. */
     while (kbinput == ERR)
@@ -527,7 +588,15 @@ int parse_kbinput(WINDOW *win)
     } else if (retval == shiftcontrolend) {
 	shift_held = TRUE;
 	return CONTROL_END;
-    } else if (retval == shiftaltleft) {
+    } else if (retval == altleft)
+	return ALT_LEFT;
+    else if (retval == altright)
+	return ALT_RIGHT;
+    else if (retval == altup)
+	return ALT_UP;
+    else if (retval == altdown)
+	return ALT_DOWN;
+    else if (retval == shiftaltleft) {
 	shift_held = TRUE;
 	return KEY_HOME;
     } else if (retval == shiftaltright) {
@@ -958,6 +1027,19 @@ int convert_sequence(const int *seq, size_t seq_len)
 		}
 		break;
 #ifndef NANO_TINY
+	    case '9': /* To accomodate iTerm2 in "xterm mode". */
+	    case '3':
+		switch (seq[4]) {
+		    case 'A': /* Esc [ 1 ; 3 A == Alt-Up on xterm. */
+			return ALT_UP;
+		    case 'B': /* Esc [ 1 ; 3 B == Alt-Down on xterm. */
+			return ALT_DOWN;
+		    case 'C': /* Esc [ 1 ; 3 C == Alt-Right on xterm. */
+			return ALT_RIGHT;
+		    case 'D': /* Esc [ 1 ; 3 D == Alt-Left on xterm. */
+			return ALT_LEFT;
+		}
+		break;
 	    case '4':
 		/* When the arrow keys are held together with Shift+Meta,
 		 * act as if they are Home/End/PgUp/PgDown with Shift. */
@@ -1252,7 +1334,7 @@ int parse_escape_sequence(WINDOW *win, int kbinput)
 	    suppress_cursorpos = FALSE;
 	    lastmessage = HUSH;
 	    if (currmenu == MMAIN) {
-		place_the_cursor(TRUE);
+		place_the_cursor();
 		curs_set(1);
 	    }
 	}
@@ -1415,11 +1497,6 @@ long get_unicode_kbinput(WINDOW *win, int kbinput)
 	statusline(HUSH, _("Unicode Input: %s"), partial);
     }
 
-#ifdef DEBUG
-    fprintf(stderr, "get_unicode_kbinput(): kbinput = %d, uni_digits = %d, uni = %ld, retval = %ld\n",
-						kbinput, uni_digits, uni, retval);
-#endif
-
     /* If we have an end result, reset the Unicode digit counter. */
     if (retval != ERR)
 	uni_digits = 0;
@@ -1508,6 +1585,8 @@ int *parse_verbatim_kbinput(WINDOW *win, size_t *count)
 {
     int *kbinput;
 
+    reveal_cursor = TRUE;
+
     /* Read in the first code. */
     while ((kbinput = get_input(win, 1)) == NULL)
 	;
@@ -1536,6 +1615,8 @@ int *parse_verbatim_kbinput(WINDOW *win, size_t *count)
 	else {
 	    char *multibyte;
 	    int onebyte, i;
+
+	    reveal_cursor = FALSE;
 
 	    while (unicode == ERR) {
 		free(kbinput);
@@ -1655,9 +1736,7 @@ int get_mouseinput(int *mouse_x, int *mouse_y, bool allow_shortcuts)
 	    /* Adjust the index if we hit the last two wider ones. */
 	    if ((j > number) && (*mouse_x % i < COLS % i))
 		j -= 2;
-#ifdef DEBUG
-	    fprintf(stderr, "Calculated %i as index in shortcut list, currmenu = %x.\n", j, currmenu);
-#endif
+
 	    /* Ignore releases/clicks of the first mouse button beyond
 	     * the last shortcut. */
 	    if (j > number)
@@ -1675,9 +1754,6 @@ int get_mouseinput(int *mouse_x, int *mouse_y, bool allow_shortcuts)
 		if (j == 0)
 		    break;
 	    }
-#ifdef DEBUG
-	    fprintf(stderr, "Stopped on func %ld present in menus %x\n", (long)f->scfunc, f->menus);
-#endif
 
 	    /* And put the corresponding key into the keyboard buffer. */
 	    if (f != NULL) {
@@ -1705,12 +1781,10 @@ int get_mouseinput(int *mouse_x, int *mouse_y, bool allow_shortcuts)
 	if (in_edit || (in_bottomwin && *mouse_y == 0)) {
 	    int i;
 
-	    /* One upward roll of the mouse wheel is equivalent to
-	     * moving up three lines, and one downward roll of the mouse
-	     * wheel is equivalent to moving down three lines. */
+	    /* One roll of the mouse wheel should move three lines. */
 	    for (i = 0; i < 3; i++)
 		unget_kbinput((mevent.bstate & BUTTON4_PRESSED) ?
-				KEY_PPAGE : KEY_NPAGE, FALSE);
+				KEY_UP : KEY_DOWN, FALSE);
 
 	    return 1;
 	} else
@@ -1895,7 +1969,9 @@ char *display_string(const char *buf, size_t column, size_t span, bool isdata)
 	} else if (*buf == '\t') {
 	    /* Show a tab as a visible character, or as as a space. */
 #ifndef NANO_TINY
-	    if (ISSET(WHITESPACE_DISPLAY)) {
+	    if (ISSET(WHITESPACE_DISPLAY) && (index > 0 || !isdata ||
+			!ISSET(SOFTWRAP) || column % tabsize == 0 ||
+			column == start_col)) {
 		int i = 0;
 
 		while (i < whitespace_len[0])
@@ -1966,6 +2042,19 @@ char *display_string(const char *buf, size_t column, size_t span, bool isdata)
     return converted;
 }
 
+/* Determine the sequence number of the given buffer in the circular list. */
+int buffer_number(openfilestruct *buffer)
+{
+    int count = 1;
+
+    while (buffer != firstfile) {
+	buffer = buffer->prev;
+	count++;
+    }
+
+    return count;
+}
+
 /* If path is NULL, we're in normal editing mode, so display the current
  * version of nano, the current filename, and whether the current file
  * has been modified on the titlebar.  If path isn't NULL, we're either
@@ -1979,20 +2068,20 @@ void titlebar(const char *path)
 	/* The width that "Modified" would take up. */
     size_t offset = 0;
 	/* The position at which the center part of the titlebar starts. */
-    const char *branding = BRANDING;
+    const char *upperleft = "";
 	/* What is shown in the top left corner. */
     const char *prefix = "";
-	/* What is shown before the path -- "File:", "DIR:", or "". */
+	/* What is shown before the path -- "DIR:" or nothing. */
     const char *state = "";
 	/* The state of the current buffer -- "Modified", "View", or "". */
     char *caption;
 	/* The presentable form of the pathname. */
+    char *indicator = NULL;
+	/* The buffer sequence number plus buffer count. */
 
     /* If the screen is too small, there is no titlebar. */
     if (topwin == NULL)
 	return;
-
-    assert(path != NULL || openfile->filename != NULL);
 
     wattron(topwin, interface_color_pair[TITLE_BAR]);
 
@@ -2004,19 +2093,25 @@ void titlebar(const char *path)
      * then sacrifice the prefix, and only then start dottifying. */
 
     /* Figure out the path, prefix and state strings. */
-    if (inhelp)
-	branding = "";
 #ifdef ENABLE_BROWSER
-    else if (path != NULL)
+    if (!inhelp && path != NULL)
 	prefix = _("DIR:");
+    else
 #endif
-    else {
+    if (!inhelp) {
+	/* If there are/were multiple buffers, show which out of how many. */
+	if (more_than_one) {
+	    indicator = charalloc(24);
+	    sprintf(indicator, "[%i/%i]", buffer_number(openfile),
+					buffer_number(firstfile->prev));
+	    upperleft = indicator;
+	} else
+	    upperleft = BRANDING;
+
 	if (openfile->filename[0] == '\0')
 	    path = _("New Buffer");
-	else {
+	else
 	    path = openfile->filename;
-	    prefix = _("File:");
-	}
 
 	if (openfile->modified)
 	    state = _("Modified");
@@ -2027,7 +2122,7 @@ void titlebar(const char *path)
     }
 
     /* Determine the widths of the four elements, including their padding. */
-    verlen = strlenpt(branding) + 3;
+    verlen = strlenpt(upperleft) + 3;
     prefixlen = strlenpt(prefix);
     if (prefixlen > 0)
 	prefixlen++;
@@ -2040,7 +2135,7 @@ void titlebar(const char *path)
 
     /* Only print the version message when there is room for it. */
     if (verlen + prefixlen + pathlen + pluglen + statelen <= COLS)
-	mvwaddstr(topwin, 0, 2, branding);
+	mvwaddstr(topwin, 0, 2, upperleft);
     else {
 	verlen = 2;
 	/* If things don't fit yet, give up the placeholder. */
@@ -2052,6 +2147,8 @@ void titlebar(const char *path)
 	    statelen -= 2;
 	}
     }
+
+    free(indicator);
 
     /* If we have side spaces left, center the path name. */
     if (verlen > 0)
@@ -2148,13 +2245,11 @@ void statusline(message_type importance, const char *msg, ...)
     if (importance == ALERT) {
 	if (++alerts > 3 && !ISSET(NO_PAUSES))
 	    msg = _("Further warnings were suppressed");
-	beep();
+	else if (alerts < 4)
+	    beep();
     }
 
     lastmessage = importance;
-
-    /* Turn the cursor off while fiddling in the statusbar. */
-    curs_set(0);
 
     blank_statusbar();
 
@@ -2257,8 +2352,6 @@ void bottombars(int menu)
  * the whole string!  We do not bother padding the entry with blanks. */
 void onekey(const char *keystroke, const char *desc, int length)
 {
-    assert(keystroke != NULL && desc != NULL);
-
     wattron(bottomwin, interface_color_pair[KEY_COMBO]);
     waddnstr(bottomwin, keystroke, actual_x(keystroke, length));
     wattroff(bottomwin, interface_color_pair[KEY_COMBO]);
@@ -2275,7 +2368,7 @@ void onekey(const char *keystroke, const char *desc, int length)
 
 /* Redetermine current_y from the position of current relative to edittop,
  * and put the cursor in the edit window at (current_y, "current_x"). */
-void place_the_cursor(bool forreal)
+void place_the_cursor(void)
 {
     ssize_t row = 0;
     size_t col, xpt = xplustabs();
@@ -2306,8 +2399,7 @@ void place_the_cursor(bool forreal)
     if (row < editwinrows)
 	wmove(edit, row, margin + col);
 
-    if (forreal)
-	openfile->current_y = row;
+    openfile->current_y = row;
 }
 
 /* edit_draw() takes care of the job of actually painting a line into
@@ -2331,16 +2423,13 @@ void edit_draw(filestruct *fileptr, const char *converted,
 	 * might be beyond the null terminator of the string. */
 #endif
 
-    assert(openfile != NULL && fileptr != NULL && converted != NULL);
-    assert(strlenpt(converted) <= editwincols);
-
 #ifdef ENABLE_LINENUMBERS
     /* If line numbering is switched on, put a line number in front of
      * the text -- but only for the parts that are not softwrapped. */
     if (margin > 0) {
 	wattron(edit, interface_color_pair[LINE_NUMBER]);
 #ifndef NANO_TINY
-	if (ISSET(SOFTWRAP) && from_x != 0)
+	if (ISSET(SOFTWRAP) && from_col != 0)
 	    mvwprintw(edit, row, 0, "%*s", margin - 1, " ");
 	else
 #endif
@@ -2654,9 +2743,9 @@ void edit_draw(filestruct *fileptr, const char *converted,
 		paintlen = actual_x(thetext, end_col - start_col);
 	    }
 
-	    wattron(edit, hilite_attribute);
+	    wattron(edit, interface_color_pair[SELECTED_TEXT]);
 	    mvwaddnstr(edit, row, margin + start_col, thetext, paintlen);
-	    wattroff(edit, hilite_attribute);
+	    wattroff(edit, interface_color_pair[SELECTED_TEXT]);
 	}
     }
 #endif /* !NANO_TINY */
@@ -2803,31 +2892,27 @@ int go_back_chunks(int nrows, filestruct **line, size_t *leftedge)
 {
     int i;
 
-    /* Don't move more chunks than the window can hold. */
-    if (nrows > editwinrows - 1)
-	nrows = (editwinrows < 2) ? 1 : editwinrows - 1;
-
 #ifndef NANO_TINY
     if (ISSET(SOFTWRAP)) {
-	size_t current_leftedge = *leftedge;
-
 	/* Recede through the requested number of chunks. */
 	for (i = nrows; i > 0; i--) {
-	    if (current_leftedge > 0) {
-		current_leftedge = leftedge_for(current_leftedge - 1, *line);
-		continue;
-	    }
+	    size_t chunk = chunk_for(*leftedge, *line);
+
+	    *leftedge = 0;
+
+	    if (chunk >= i)
+		return go_forward_chunks(chunk - i, line, leftedge);
 
 	    if (*line == openfile->fileage)
 		break;
 
+	    i -= chunk;
 	    *line = (*line)->prev;
-	    current_leftedge = leftedge_for((size_t)-1, *line);
+	    *leftedge = HIGHEST_POSITIVE;
 	}
 
-	/* Only change leftedge when we actually could move. */
-	if (i < nrows)
-	    *leftedge = current_leftedge;
+	if (*leftedge == HIGHEST_POSITIVE)
+	    *leftedge = leftedge_for(*leftedge, *line);
     } else
 #endif
 	for (i = nrows; i > 0 && (*line)->prev != NULL; i--)
@@ -2843,10 +2928,6 @@ int go_back_chunks(int nrows, filestruct **line, size_t *leftedge)
 int go_forward_chunks(int nrows, filestruct **line, size_t *leftedge)
 {
     int i;
-
-    /* Don't move more chunks than the window can hold. */
-    if (nrows > editwinrows - 1)
-	nrows = (editwinrows < 2) ? 1 : editwinrows - 1;
 
 #ifndef NANO_TINY
     if (ISSET(SOFTWRAP)) {
@@ -2900,7 +2981,7 @@ bool less_than_a_screenful(size_t was_lineno, size_t was_leftedge)
 
 /* Scroll the edit window in the given direction and the given number of rows,
  * and draw new lines on the blank lines left after the scrolling. */
-void edit_scroll(scroll_dir direction, int nrows)
+void edit_scroll(bool direction, int nrows)
 {
     filestruct *line;
     size_t leftedge;
@@ -2910,7 +2991,7 @@ void edit_scroll(scroll_dir direction, int nrows)
 
     /* Move the top line of the edit window the requested number of rows up or
      * down, and reduce the number of rows with the amount we couldn't move. */
-    if (direction == UPWARD)
+    if (direction == BACKWARD)
 	nrows -= go_back_chunks(nrows, &openfile->edittop, &openfile->firstcolumn);
     else
 	nrows -= go_forward_chunks(nrows, &openfile->edittop, &openfile->firstcolumn);
@@ -2933,7 +3014,7 @@ void edit_scroll(scroll_dir direction, int nrows)
 
     /* Scroll the text of the edit window a number of rows up or down. */
     scrollok(edit, TRUE);
-    wscrl(edit, (direction == UPWARD) ? -nrows : nrows);
+    wscrl(edit, (direction == BACKWARD) ? -nrows : nrows);
     scrollok(edit, FALSE);
 
     /* Part 2: nrows is now the number of rows in the scrolled region of the
@@ -2949,16 +3030,18 @@ void edit_scroll(scroll_dir direction, int nrows)
     leftedge = openfile->firstcolumn;
 
     /* If we scrolled forward, move down to the start of the blank region. */
-    if (direction == DOWNWARD)
+    if (direction == FORWARD)
 	go_forward_chunks(editwinrows - nrows, &line, &leftedge);
 
 #ifndef NANO_TINY
-    /* Compensate for the earlier chunks of a softwrapped line. */
-    nrows += chunk_for(leftedge, line);
+    if (ISSET(SOFTWRAP)) {
+	/* Compensate for the earlier chunks of a softwrapped line. */
+	nrows += chunk_for(leftedge, line);
 
-    /* Don't compensate for the chunks that are offscreen. */
-    if (line == openfile->edittop)
-	nrows -= chunk_for(openfile->firstcolumn, line);
+	/* Don't compensate for the chunks that are offscreen. */
+	if (line == openfile->edittop)
+	    nrows -= chunk_for(openfile->firstcolumn, line);
+    }
 #endif
 
     /* Draw new content on the blank rows inside the scrolled region
@@ -2978,61 +3061,63 @@ void edit_scroll(scroll_dir direction, int nrows)
 size_t get_softwrap_breakpoint(const char *text, size_t leftedge,
 				bool *end_of_line)
 {
-    size_t index = 0;
-	/* Current index in text. */
     size_t column = 0;
 	/* Current column position in text. */
-    size_t prev_column = 0;
+    size_t previous_col = 0;
 	/* Previous column position in text. */
     size_t goal_column;
-	/* Column of the last character where we can break the text. */
-    bool found_blank = FALSE;
-	/* Did we find at least one blank? */
-    size_t lastblank_index = 0;
-	/* Current index of the last blank in text. */
-    size_t lastblank_column = 0;
-	/* Current column position of the last blank in text. */
+	/* The place at or before which text must be broken. */
+    size_t last_blank_col = 0;
+	/* The column position of the last seen whitespace character. */
+    const char *farthest_blank = NULL;
+	/* A pointer to the last seen whitespace character in text. */
     int char_len = 0;
-	/* Length of current character, in bytes. */
+	/* Length of the current character, in bytes. */
 
-    while (*text != '\0' && column < leftedge)
-	text += parse_mbchar(text, NULL, &column);
+    while (*text != '\0' && column < leftedge) {
+	char_len = parse_mbchar(text, NULL, &column);
+	text += char_len;
+    }
 
-    /* Use a full screen row for text. */
-    goal_column = column + editwincols;
+    /* The intention is to use the entire available width. */
+    goal_column = leftedge + editwincols;
 
     while (*text != '\0' && column <= goal_column) {
 	/* When breaking at blanks, do it *before* the target column. */
 	if (ISSET(AT_BLANKS) && is_blank_mbchar(text) && column < goal_column) {
-	    found_blank = TRUE;
-	    lastblank_index = index;
-	    lastblank_column = column;
+	    farthest_blank = text;
+	    last_blank_col = column;
 	}
 
-	prev_column = column;
+	previous_col = column;
 	char_len = parse_mbchar(text, NULL, &column);
 	text += char_len;
-	index += char_len;
     }
 
-    /* If we didn't overshoot the target, we've found a breaking point. */
+    /* If we didn't overshoot the limit, we've found a breaking point;
+     * and we've reached EOL if we didn't even *reach* the limit. */
     if (column <= goal_column) {
-	/* We've reached EOL if we didn't even reach the target. */
 	*end_of_line = (column < goal_column);
 	return column;
     }
 
-    /* If we're softwrapping at blanks and we found at least one blank, move
-     * the pointer back to the last blank, step beyond it, and we're done. */
-    if (found_blank) {
-	text = text - index + lastblank_index;
-	parse_mbchar(text, NULL, &lastblank_column);
-	return lastblank_column;
+    /* If we're softwrapping at blanks and we found at least one blank, break
+     * after that blank -- if it doesn't overshoot the screen's edge. */
+    if (farthest_blank != NULL) {
+	char_len = parse_mbchar(farthest_blank, NULL, &last_blank_col);
+	text = farthest_blank + char_len;
+
+	if (last_blank_col <= goal_column)
+	    return last_blank_col;
     }
 
+    /* If a tab is split over two chunks, break at the screen's edge. */
+    if (*(text - char_len) == '\t')
+	previous_col = goal_column;
+
     /* Otherwise, return the column of the last character that doesn't
-     * overshoot the target, since we can't break the text anywhere else. */
-    return (editwincols > 1) ? prev_column : column - 1;
+     * overshoot the limit, since we can't break the text anywhere else. */
+    return (editwincols > 1) ? previous_col : column - 1;
 }
 
 /* Get the row of the softwrapped chunk of the given line that column is on,
@@ -3062,7 +3147,10 @@ size_t get_chunk_and_edge(size_t column, filestruct *line, size_t *leftedge)
  * relative to the first row (zero-based). */
 size_t chunk_for(size_t column, filestruct *line)
 {
-    return get_chunk_and_edge(column, line, NULL);
+    if (ISSET(SOFTWRAP))
+	return get_chunk_and_edge(column, line, NULL);
+    else
+	return 0;
 }
 
 /* Return the leftmost column of the softwrapped chunk of the given line that
@@ -3070,6 +3158,9 @@ size_t chunk_for(size_t column, filestruct *line)
 size_t leftedge_for(size_t column, filestruct *line)
 {
     size_t leftedge;
+
+    if (!ISSET(SOFTWRAP))
+	return 0;
 
     get_chunk_and_edge(column, line, &leftedge);
 
@@ -3110,7 +3201,7 @@ size_t actual_last_column(size_t leftedge, size_t column)
 
 	/* If we're not on the last chunk, we're one column past the end of
 	 * the row.  Shifting back one column might put us in the middle of
-	  * a multi-column character, but actual_x() will fix that later. */
+	 * a multi-column character, but actual_x() will fix that later. */
 	if (!last_chunk)
 	    end_col--;
 
@@ -3169,7 +3260,7 @@ bool current_is_offscreen(void)
 
 /* Update any lines between old_current and current that need to be
  * updated.  Use this if we've moved without changing any text. */
-void edit_redraw(filestruct *old_current)
+void edit_redraw(filestruct *old_current, update_type manner)
 {
     size_t was_pww = openfile->placewewant;
 
@@ -3177,7 +3268,7 @@ void edit_redraw(filestruct *old_current)
 
     /* If the current line is offscreen, scroll until it's onscreen. */
     if (current_is_offscreen()) {
-	adjust_viewport((focusing || !ISSET(SMOOTH_SCROLL)) ? CENTERING : FLOWING);
+	adjust_viewport(ISSET(SMOOTH_SCROLL) ? manner : CENTERING);
 	refresh_needed = TRUE;
 	return;
     }
@@ -3222,17 +3313,8 @@ void edit_refresh(void)
 #endif
 
     /* If the current line is out of view, get it back on screen. */
-    if (current_is_offscreen()) {
-#ifdef DEBUG
-	fprintf(stderr, "edit-refresh: line = %ld, edittop = %ld and editwinrows = %d\n",
-		(long)openfile->current->lineno, (long)openfile->edittop->lineno, editwinrows);
-#endif
-	adjust_viewport((focusing || !ISSET(SMOOTH_SCROLL)) ? CENTERING : STATIONARY);
-    }
-
-#ifdef DEBUG
-    fprintf(stderr, "edit-refresh: now edittop = %ld\n", (long)openfile->edittop->lineno);
-#endif
+    if (current_is_offscreen())
+	adjust_viewport((focusing || !ISSET(SMOOTH_SCROLL)) ? CENTERING : FLOWING);
 
     line = openfile->edittop;
 
@@ -3247,7 +3329,7 @@ void edit_refresh(void)
     while (row < editwinrows)
 	blank_row(edit, row++, 0, COLS);
 
-    place_the_cursor(TRUE);
+    place_the_cursor();
     wnoutrefresh(edit);
 
     refresh_needed = FALSE;
@@ -3277,10 +3359,6 @@ void adjust_viewport(update_type manner)
 
     /* Move edittop back goal rows, starting at current[current_x]. */
     go_back_chunks(goal, &openfile->edittop, &openfile->firstcolumn);
-
-#ifdef DEBUG
-    fprintf(stderr, "adjust_viewport(): setting edittop to lineno %ld\n", (long)openfile->edittop->lineno);
-#endif
 }
 
 /* Unconditionally redraw the entire screen. */
@@ -3344,9 +3422,6 @@ void do_cursorpos(bool force)
 	return;
     }
 
-    /* Hide the cursor while we are calculating. */
-    curs_set(0);
-
     /* Determine the size of the file up to the cursor. */
     saved_byte = openfile->current->data[openfile->current_x];
     openfile->current->data[openfile->current_x] = '\0';
@@ -3400,7 +3475,7 @@ void spotlight(bool active, size_t from_col, size_t to_col)
     char *word;
     size_t word_span, room;
 
-    place_the_cursor(FALSE);
+    place_the_cursor();
 
 #ifndef NANO_TINY
     if (ISSET(SOFTWRAP)) {
@@ -3427,7 +3502,7 @@ void spotlight(bool active, size_t from_col, size_t to_col)
 	room--;
 
     if (active)
-	wattron(edit, hilite_attribute);
+	wattron(edit, interface_color_pair[SELECTED_TEXT]);
 
     waddnstr(edit, word, actual_x(word, room));
 
@@ -3435,7 +3510,7 @@ void spotlight(bool active, size_t from_col, size_t to_col)
 	waddch(edit, '$');
 
     if (active)
-	wattroff(edit, hilite_attribute);
+	wattroff(edit, interface_color_pair[SELECTED_TEXT]);
 
     free(word);
 
@@ -3474,12 +3549,12 @@ void spotlight_softwrapped(bool active, size_t from_col, size_t to_col)
 					break_col - from_col, FALSE);
 
 	if (active)
-	    wattron(edit, hilite_attribute);
+	    wattron(edit, interface_color_pair[SELECTED_TEXT]);
 
 	waddnstr(edit, word, actual_x(word, break_col));
 
 	if (active)
-	    wattroff(edit, hilite_attribute);
+	    wattroff(edit, interface_color_pair[SELECTED_TEXT]);
 
 	free(word);
 
@@ -3582,7 +3657,6 @@ void do_credits(void)
 	window_init();
     }
 
-    curs_set(0);
     nodelay(edit, TRUE);
 
     blank_titlebar();

@@ -132,6 +132,12 @@
 #define DISABLE_WRAPJUSTIFY 1
 #endif
 
+#define BACKWARD FALSE
+#define FORWARD TRUE
+
+#define BLIND FALSE
+#define VISIBLE TRUE
+
 /* Enumeration types. */
 typedef enum {
     NIX_FILE, DOS_FILE, MAC_FILE
@@ -150,10 +156,6 @@ typedef enum {
 } mark_type;
 
 typedef enum {
-    UPWARD, DOWNWARD
-} scroll_dir;
-
-typedef enum {
     CENTERING, FLOWING, STATIONARY
 } update_type;
 
@@ -162,6 +164,7 @@ typedef enum {
 #ifndef DISABLE_WRAPPING
     SPLIT_BEGIN, SPLIT_END,
 #endif
+    INDENT, UNINDENT,
 #ifdef ENABLE_COMMENT
     COMMENT, UNCOMMENT, PREFLIGHT,
 #endif
@@ -300,6 +303,8 @@ typedef struct undo_group {
 	/* First line of group. */
     ssize_t bottom_line;
 	/* Last line of group. */
+    char **indentations;
+	/* String data used to restore the affected lines; one per line. */
     struct undo_group *next;
 } undo_group;
 
@@ -469,6 +474,7 @@ enum
 {
     TITLE_BAR = 0,
     LINE_NUMBER,
+    SELECTED_TEXT,
     STATUS_BAR,
     KEY_COMBO,
     FUNCTION_TAG,
@@ -559,22 +565,26 @@ enum
 #define CONTROL_RIGHT 0x402
 #define CONTROL_UP 0x403
 #define CONTROL_DOWN 0x404
-#define CONTROL_HOME 0x411
-#define CONTROL_END 0x412
-#define SHIFT_CONTROL_LEFT 0x405
-#define SHIFT_CONTROL_RIGHT 0x406
-#define SHIFT_CONTROL_UP 0x407
-#define SHIFT_CONTROL_DOWN 0x408
-#define SHIFT_CONTROL_HOME 0x413
-#define SHIFT_CONTROL_END 0x414
-#define SHIFT_ALT_LEFT 0x409
-#define SHIFT_ALT_RIGHT 0x40a
-#define SHIFT_ALT_UP 0x40b
-#define SHIFT_ALT_DOWN 0x40c
-#define SHIFT_PAGEUP 0x40d
-#define SHIFT_PAGEDOWN 0x40e
-#define SHIFT_HOME 0x40f
-#define SHIFT_END 0x410
+#define CONTROL_HOME 0x405
+#define CONTROL_END 0x406
+#define SHIFT_CONTROL_LEFT 0x411
+#define SHIFT_CONTROL_RIGHT 0x412
+#define SHIFT_CONTROL_UP 0x413
+#define SHIFT_CONTROL_DOWN 0x414
+#define SHIFT_CONTROL_HOME 0x415
+#define SHIFT_CONTROL_END 0x416
+#define ALT_LEFT 0x421
+#define ALT_RIGHT 0x422
+#define ALT_UP 0x423
+#define ALT_DOWN 0x424
+#define SHIFT_ALT_LEFT 0x431
+#define SHIFT_ALT_RIGHT 0x432
+#define SHIFT_ALT_UP 0x433
+#define SHIFT_ALT_DOWN 0x434
+#define SHIFT_HOME 0x455
+#define SHIFT_END 0x456
+#define SHIFT_PAGEUP 0x457
+#define SHIFT_PAGEDOWN 0x458
 
 #ifdef USE_SLANG
 #ifdef ENABLE_UTF8

@@ -1,3 +1,189 @@
+Changes between v2.8.6 and v2.8.7:
+----------------------------------
+
+Benno Schulenberg (54):
+      bindings: hard-bind Alt+Up and Alt+Down to findprevious and findnext
+      browser: correct the inverted search behavior for Alt+Up/Alt+Down
+      bump version numbers and add a news item for the 2.8.7 release
+      display: catch all cases where the cursor can be pushed offscreen
+      display: don't doubly show tabs that cross a chunk boundary
+      files: do not silently ignore an invalid backup directory, but die
+      files: don't close a file descriptor when opening failed  [coverity scan]
+      files: don't try to open a negative file descriptor  [coverity scan]
+      gnulib: update to its current upstream state
+      linting: don't try to put the cursor at a negative x position
+      linting: skip the introductory message produced by 'gcc -fshow-column'
+      mouse: one click of the wheel should move three lines, not three pages
+      moving: don't push x forward when backward movement lands on a split tab
+      moving: get <Up> unstuck when trying to pass over a sprawling tab
+      moving: improve retention of the target column somewhat
+      moving: the current chunk is always 0 when not in softwrap mode
+      moving: use the correct formula for pushing the index forward
+      rcfile: don't leak a shortcut when something goes wrong  [coverity scan]
+      softwrap: properly move up and down over tabs that are split over rows
+      syntax: c: give labels some color too
+      syntax: html: don't bother coloring tags that cross line boundaries
+      syntax: python: don't require a character after an opening triple quote
+      text: properly unindent lines that consist of only whitespace
+      tweaks: a comma does not end a sentence, and is not part of a variable
+      tweaks: adjust the indentation after the previous change
+      tweaks: adjust the indentation after the previous change
+      tweaks: adjust the indentation after the previous change
+      tweaks: allow enough space for the Y/N/A characters  [coverity scan]
+      tweaks: avoid trying to stat a file that might be NULL  [coverity scan]
+      tweaks: close a file also in the error path  [coverity scan]
+      tweaks: condense or improve some comments
+      tweaks: condense some logic, to elide a variable and a comment
+      tweaks: do not leak the indentation when all lines are empty
+      tweaks: don't close a descriptor when its stream has already been closed
+      tweaks: drop some debugging stuff
+      tweaks: drop some debugging stuff, and frob two comments
+      tweaks: elide an unneeded pointer
+      tweaks: elide the global variable 'full_operating_dir'
+      tweaks: fix compilation with --enable-{tiny,help,multibuffer}
+      tweaks: group all movement routines in corresponding pairs
+      tweaks: keep the const qualifier of the syntax name  [coverity scan]
+      tweaks: remove includes that appear to be superfluous
+      tweaks: rename a function, to let it make more sense
+      tweaks: rename a label, to better match its task
+      tweaks: renumber the special key codes, to be in sequence and grouped
+      tweaks: reshuffle code and frob comments, to reduce the number of lines
+      tweaks: reshuffle some code to harmonize two related functions
+      tweaks: reshuffle some declarations and trim a few comments
+      tweaks: restore an include that is necessary on some platforms
+      tweaks: show "where is next" in the help lines of the file browser
+      tweaks: simply set the proper scrolling mode, instead of imitating it
+      tweaks: snip a superfluous clearing of the bottom bars after help
+      tweaks: sort the includes, so it's a little easier to see what is there
+      tweaks: specify more directly in what manner to move the viewport
+
+David Lawrence Ramsey (23):
+      browser: allow backward/forward re-searches with Alt+Up/Alt+Down
+      display: constrain line numbers on softwrapped lines with sprawling tabs
+      display: do show the visible character for a tab when it starts a row
+      display: revamp how screen updates are done in the movement code
+      moving: redraw not just the new current line but also the prior one
+      small addition: allow customizing the color of selected text
+      softwrap: correctly move vertically through overwide tabs
+      softwrap: don't push a straddling tab to the next chunk
+      softwrap: improve left/right navigation across line boundaries
+      softwrap: make sure char_len is set when a tab is wider than a chunk
+      softwrap: properly update the viewport when adding text at firstcolumn
+      text: make indenting add to the beginning of the line
+      text: make unindenting remove from the beginning of the line
+      tweaks: adjust spacing and wording in sample.nanorc
+      tweaks: correct a comment typo and an indentation error
+      tweaks: harmonize some prototypes with their functions
+      tweaks: remove unneeded parentheses and blank line and braces
+      tweaks: replace a misplaced tab with a space
+      tweaks: set the target row for smooth scrolling more directly
+      tweaks: use charalloc() instead of (char *)nmalloc() * sizeof(char)
+      weeding: drop the forreal parameter from place_the_cursor()
+      weeding: remove redundant casts of nmalloc()
+      weeding: remove the unused be_clever parameter from do_home()/do_end()
+
+Rishabh Dave (1):
+      new feature: allow pasting at all input prompts
+
+Urja Rannikko (1):
+      bindings: hard-bind Alt+Left and Alt+Right to buffer switching
+
+
+Changes between v2.8.5 and v2.8.6:
+----------------------------------
+
+Benno Schulenberg (58):
+      build: for Solaris, tell the linker to use a threading lib
+      bump version numbers and add a news item for the 2.8.6 release
+      display: avoid a jumpy cursor by redrawing bottom bars only when needed
+      display: when back in the main loop, always redraw the help lines
+      display: wipe stale messages from the status bar straightaway
+      docs: add some more mark-up to the Info document
+      docs: be more precise about when a dash is given instead of a filename
+      docs: drop the cluttering Info-style links from the HTML manual
+      docs: improve cross references and mark-up in the Info document
+      docs: improve some spacing, especially of the synopsis in the PDF
+      docs: make the guillemot and the middle dot appear correctly in HTML
+      docs: move the descriptions of 'header' and 'magic' next to 'syntax'
+      docs: remove the mention of backslashes for the argument of 'comment'
+      docs: reword the explanation of the 'syntax' command
+      docs: use real cross references in the Info document
+      docs: use the @command and @option mark-up more consistently
+      files: don't bother counting rows when opening a fresh buffer
+      files: warn more conspicuously when the file on disk has changed
+      gnulib: update to its current state
+      input: recognize the Ctrl+Arrow key sequences from Haiku's Terminal
+      options: recognize -a and --atblanks on the command line
+      options: rename --cut to --cutfromcursor, to be clearer
+      pasting: restore the cap on the number of chunks to move backward
+      rcfile: don't require backslashing in the argument of 'comment'
+      screen: defeat a VTE/Konsole bug also for the case of --constantshow
+      screen: retain the same help-line tags when the window is resized
+      softwrap: when possible, go back a whole bunch of chunks at a time
+      startup: don't try parsing color names that were not specified
+      startup: in default mode, display the tail of the file as Pico does
+      suspension: prevent entering an invalid byte upon resume (with S-Lang)
+      syntax: gentoo: make it clearer that the file contains two syntaxes
+      syntax: man, groff: fix the string that introduces a comment
+      syntax: nanorc: don't color numeric arguments specially
+      syntax: nanorc: don't color the argument of 'linter' as if invalid
+      syntax: texinfo: cover also some special cases like @U, @OE and @TeX
+      tweaks: adjust an error message so it fits all possible cases
+      tweaks: avoid a clang warning about an expression being treated as NULL
+      tweaks: avoid a failure with black diamonds in a PDF
+      tweaks: avoid an unused-variable warning for the tiny version
+      tweaks: chuck some debugging stuff
+      tweaks: chuck two useless asserts, and elide a call to strncasecmp()
+      tweaks: correct two conditions for conditional compilation
+      tweaks: drop a bunch of useless asserts
+      tweaks: elide unneeded calls of get_last_chunk_leftedge()
+      tweaks: fix compilation with --enable-tiny
+      tweaks: move an include to the file that actually makes use of it
+      tweaks: put declarations always first, so it will compile on Haiku
+      tweaks: recognize the empty string as comment inhibitor, instead of NULL
+      tweaks: remove two superfluous includes
+      tweaks: rename a constant, to match the corresponding option
+      tweaks: rename another constant, to be more precise
+      tweaks: rename a variable, to have more contrast
+      tweaks: rename four functions, to be more distinct
+      tweaks: rename two variables, to make a little sense
+      tweaks: reshuffle some things to condense the code
+      tweaks: simplify the parsing of color combinations
+      tweaks: spell an option correctly in NEWS
+      tweaks: swap ^X and ^L in the help lines of the help viewer
+
+David Lawrence Ramsey (29):
+      display: when converting tabs, don't go beyond the screen width
+      docs: consistently describe the -U/-c and -r/-w overrides
+      docs: mention that boldtext can be overridden also for function tags
+      docs: mention the default values for comment and whitespace directives
+      moving: fix the cursor jumping back and forth with non-smooth paging
+      moving: make vertical movement account for varying chunk width
+      new feature: allow lines to be softwrapped at whitespace
+      replacing: make spotlight() account for varying chunk width
+      softwrap: add new functions for chunks of varying width
+      softwrap: don't flag EOL too early, nor break continuous text too early
+      softwrap: in do_mouse(), keep the cursor before a softwrap breakpoint
+      softwrap: make the changes to actually allow the chunk width to vary
+      softwrap: prepare for allowing the chunk width to vary
+      softwrap: remove unneeded caps on the number of chunks to move
+      syntax: nanorc: properly color a "fill" option with a negative value
+      text: adjust the comments in do_indent() and do_unindent()
+      text: make do_unindent() an exact copy of do_indent()
+      text: make sure commenting is disabled when comment "" was specified
+      text: normalize the indentation in do_indent() and do_unindent()
+      text: remove indent-related code from do_unindent()
+      text: remove the last usage of cols in do_indent() and do_unindent()
+      text: remove unindent-related code from do_indent()
+      text: remove unneeded references to cols from the indentation routines
+      text: update placewewant properly when indenting/unindenting
+      tweaks: correct a parameter type, and correct two empty initializations
+      tweaks: fix a typo in NEWS
+      tweaks: only compensate for a partially-offscreen line in softwrap mode
+      tweaks: remove unneeded braces, and mark empty parameter list as void
+      usage: a dash doesn't have to come first among the filenames
+
+
 Changes between v2.8.4 and v2.8.5:
 ----------------------------------
 

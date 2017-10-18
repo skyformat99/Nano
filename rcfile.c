@@ -22,13 +22,11 @@
 
 #include "proto.h"
 
-#include <glob.h>
-#include <stdarg.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
+#include <errno.h>
+#include <glob.h>
+#include <string.h>
+#include <unistd.h>
 
 #ifdef ENABLE_NANORC
 
@@ -116,6 +114,7 @@ static const rcoption rcopts[] = {
 #ifndef DISABLE_COLOR
     {"titlecolor", 0},
     {"numbercolor", 0},
+    {"selectedcolor", 0},
     {"statuscolor", 0},
     {"keycolor", 0},
     {"functioncolor", 0},
@@ -353,13 +352,13 @@ void parse_syntax(char *ptr)
 bool is_universal(void (*func)(void))
 {
     if (func == do_left || func == do_right ||
-	func == do_home_void || func == do_end_void ||
+	func == do_home || func == do_end ||
 #ifndef NANO_TINY
 	func == do_prev_word_void || func == do_next_word_void ||
 #endif
-	func == do_verbatim_input || func == do_cut_text_void ||
 	func == do_delete || func == do_backspace ||
-	func == do_tab || func == do_enter)
+	func == do_cut_text_void || func == do_uncut_text ||
+	func == do_tab || func == do_enter || func == do_verbatim_input)
 	return TRUE;
     else
 	return FALSE;
@@ -389,7 +388,7 @@ void parse_binding(char *ptr, bool dobind)
 
     if (strlen(keycopy) < 2) {
 	rcfile_error(N_("Key name is too short"));
-	goto free_copy;
+	goto free_things;
     }
 
     /* Uppercase only the first two or three characters of the key name. */
@@ -400,7 +399,7 @@ void parse_binding(char *ptr, bool dobind)
 	    keycopy[2] = toupper((unsigned char)keycopy[2]);
 	else {
 	    rcfile_error(N_("Key name is too short"));
-	    goto free_copy;
+	    goto free_things;
 	}
     }
 
@@ -410,15 +409,10 @@ void parse_binding(char *ptr, bool dobind)
 	keycopy[1] = tolower((unsigned char)keycopy[1]);
     else if (keycopy[0] != '^' && keycopy[0] != 'M' && keycopy[0] != 'F') {
 	rcfile_error(N_("Key name must begin with \"^\", \"M\", or \"F\""));
-	goto free_copy;
-    } else if ((keycopy[0] == 'M' && keycopy[1] != '-') ||
-		(keycopy[0] == '^' && ((keycopy[1] < 'A' || keycopy[1] > 'z') ||
-		keycopy[1] == '[' || keycopy[1] == '`' ||
-		(strlen(keycopy) > 2 && strcmp(keycopy, "^Space") != 0))) ||
-		(strlen(keycopy) > 3 && strcmp(keycopy, "^Space") != 0 &&
-		strcmp(keycopy, "M-Space") != 0)) {
+	goto free_things;
+    } else if (keycode_from_string(keycopy) < 0) {
 	rcfile_error(N_("Key name %s is invalid"), keycopy);
-	goto free_copy;
+	goto free_things;
     }
 
     if (dobind) {
@@ -427,7 +421,7 @@ void parse_binding(char *ptr, bool dobind)
 
 	if (funcptr[0] == '\0') {
 	    rcfile_error(N_("Must specify a function to bind the key to"));
-	    goto free_copy;
+	    goto free_things;
 	}
     }
 
@@ -437,30 +431,22 @@ void parse_binding(char *ptr, bool dobind)
     if (menuptr[0] == '\0') {
 	/* TRANSLATORS: Do not translate the word "all". */
 	rcfile_error(N_("Must specify a menu (or \"all\") in which to bind/unbind the key"));
-	goto free_copy;
+	goto free_things;
     }
 
     if (dobind) {
 	newsc = strtosc(funcptr);
 	if (newsc == NULL) {
 	    rcfile_error(N_("Cannot map name \"%s\" to a function"), funcptr);
-	    goto free_copy;
+	    goto free_things;
 	}
     }
 
     menu = strtomenu(menuptr);
     if (menu < 1) {
 	rcfile_error(N_("Cannot map name \"%s\" to a menu"), menuptr);
-	goto free_copy;
+	goto free_things;
     }
-
-#ifdef DEBUG
-    if (dobind)
-	fprintf(stderr, "newsc address is now %ld, assigned func = %ld, menu = %x\n",
-	    (long)&newsc, (long)newsc->scfunc, menu);
-    else
-	fprintf(stderr, "unbinding \"%s\" from menu %x\n", keycopy, menu);
-#endif
 
     if (dobind) {
 	subnfunc *f;
@@ -485,8 +471,7 @@ void parse_binding(char *ptr, bool dobind)
 
 	if (!menu) {
 	    rcfile_error(N_("Function '%s' does not exist in menu '%s'"), funcptr, menuptr);
-	    free(newsc);
-	    goto free_copy;
+	    goto free_things;
 	}
 
 	newsc->menus = menu;
@@ -495,23 +480,14 @@ void parse_binding(char *ptr, bool dobind)
 	/* Do not allow rebinding a frequent escape-sequence starter: Esc [. */
 	if (newsc->meta && newsc->keycode == 91) {
 	    rcfile_error(N_("Sorry, keystroke \"%s\" may not be rebound"), newsc->keystr);
-	    free(newsc);
-	    goto free_copy;
+	    goto free_things;
 	}
-#ifdef DEBUG
-	fprintf(stderr, "s->keystr = \"%s\"\n", newsc->keystr);
-	fprintf(stderr, "s->keycode = \"%d\"\n", newsc->keycode);
-#endif
     }
 
     /* Now find and delete any existing same shortcut in the menu(s). */
     for (s = sclist; s != NULL; s = s->next) {
-	if ((s->menus & menu) && !strcmp(s->keystr, keycopy)) {
-#ifdef DEBUG
-	    fprintf(stderr, "deleting entry from among menus %x\n", s->menus);
-#endif
+	if ((s->menus & menu) && !strcmp(s->keystr, keycopy))
 	    s->menus &= ~menu;
-	}
     }
 
     if (dobind) {
@@ -530,7 +506,8 @@ void parse_binding(char *ptr, bool dobind)
 	return;
     }
 
-  free_copy:
+  free_things:
+    free(newsc);
     free(keycopy);
 }
 
@@ -1115,6 +1092,8 @@ void parse_rcfile(FILE *rcstream, bool syntax_only)
 	    specified_color_combo[TITLE_BAR] = option;
 	else if (strcasecmp(rcopts[i].name, "numbercolor") == 0)
 	    specified_color_combo[LINE_NUMBER] = option;
+	else if (strcasecmp(rcopts[i].name, "selectedcolor") == 0)
+	    specified_color_combo[SELECTED_TEXT] = option;
 	else if (strcasecmp(rcopts[i].name, "statuscolor") == 0)
 	    specified_color_combo[STATUS_BAR] = option;
 	else if (strcasecmp(rcopts[i].name, "keycolor") == 0)
@@ -1230,7 +1209,6 @@ void parse_one_nanorc(void)
 #ifdef DEBUG
     fprintf(stderr, "Going to parse file \"%s\"\n", nanorc);
 #endif
-
     rcstream = fopen(nanorc, "rb");
 
     /* If opening the file succeeded, parse it.  Otherwise, only

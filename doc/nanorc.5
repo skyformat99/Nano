@@ -16,8 +16,7 @@
 .\"   Documentation License along with this program.  If not, see
 .\"   <http://www.gnu.org/licenses/>.
 .\"
-.TH NANORC 5 "version 2.8.5" "June 2017"
-.\" Please adjust this date whenever revising the manpage.
+.TH NANORC 5 "version 2.8.7" "August 2017"
 
 .SH NAME
 nanorc \- GNU nano's configuration file
@@ -75,13 +74,14 @@ with \fBset backup\fR or \fB\-\-backup\fR or \fB\-B\fR.
 The uniquely numbered files are stored in the specified \fIdirectory\fR.
 .TP
 .B set backwards
-Do backwards searches by default.
+Obsolete option.  Recognized but ignored.  \fB^Q\fR is available to
+start a backward search.
 .TP
 .B set boldtext
 Use bold instead of reverse video for the title bar, status bar, key combos,
-function tags, line numbers, and selected text.  This can be overridden for
-the first five by setting the options \fBtitlecolor\fP, \fBstatuscolor\fP,
-\fBkeycolor\fP, \fBfunctioncolor\fP, and \fBnumbercolor\fP.
+function tags, line numbers, and selected text.  This can be overridden by
+setting the options \fBtitlecolor\fP, \fBstatuscolor\fP, \fBkeycolor\fP,
+\fBfunctioncolor\fP, \fBnumbercolor\fP, and \fBselectedcolor\fP.
 .TP
 .B set brackets "\fIstring\fP"
 Set the characters treated as closing brackets when justifying
@@ -219,6 +219,10 @@ won't work properly with this option enabled.
 .TP
 .B set regexp
 Do extended regular expression searches by default.
+.TP
+.B set selectedcolor \fIfgcolor\fR,\fIbgcolor\fR
+Specify the color combination to use for selected text.
+See \fBset titlecolor\fR for more details.
 .TP
 .B set showcursor
 Put the cursor on the highlighted item in the file browser, to aid
@@ -440,8 +444,11 @@ Inserts a file into the current buffer (at the current cursor position),
 or into a new buffer when option \fBmultibuffer\fR is set.
 .TP
 .B whereis
-Searches for text in the current buffer -- or for filenames matching
-a string in the current list in the file browser.
+Starts a forward search for text in the current buffer -- or for filenames
+matching a string in the current list in the file browser.
+.TP
+.B wherewas
+Starts a backward search for text in the current buffer.
 .TP
 .B searchagain
 Repeats the last search command without prompting.

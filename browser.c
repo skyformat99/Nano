@@ -21,11 +21,10 @@
 
 #include "proto.h"
 
+#include <errno.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 
 #ifdef ENABLE_BROWSER
 
@@ -55,9 +54,6 @@ char *do_browser(char *path)
 	/* The function of the key the user typed in. */
     DIR *dir;
 	/* The directory whose contents we are showing. */
-
-    /* Don't show a cursor in the file list. */
-    curs_set(0);
 
   read_directory_contents:
 	/* We come here when we refresh or select a new directory. */
@@ -107,20 +103,18 @@ char *do_browser(char *path)
     titlebar(path);
 
     while (TRUE) {
-	/* Make sure that the cursor is off. */
-	curs_set(0);
 	lastmessage = HUSH;
 
 	bottombars(MBROWSER);
 
 	/* Display (or redisplay) the file list if the list itself or
 	 * the selected file has changed. */
-	if (old_selected != selected)
+	if (old_selected != selected || ISSET(SHOW_CURSOR))
 	    browser_refresh();
 
 	old_selected = selected;
 
-	kbinput = get_kbinput(edit);
+	kbinput = get_kbinput(edit, ISSET(SHOW_CURSOR));
 
 #ifdef ENABLE_MOUSE
 	if (kbinput == KEY_MOUSE) {
@@ -171,12 +165,16 @@ char *do_browser(char *path)
 #else
 	    say_there_is_no_help();
 #endif
-	} else if (func == do_search) {
-	    /* Search for a filename. */
+	} else if (func == do_search_forward) {
 	    do_filesearch();
 	} else if (func == do_research) {
-	    /* Search for another filename. */
-	    do_fileresearch();
+	    do_fileresearch(TRUE);
+#ifndef NANO_TINY
+	} else if (func == do_findprevious) {
+	    do_fileresearch(FALSE);
+	} else if (func == do_findnext) {
+	    do_fileresearch(TRUE);
+#endif
 	} else if (func == do_left) {
 	    if (selected > 0)
 		selected--;
@@ -249,11 +247,10 @@ char *do_browser(char *path)
 	    }
 
 #ifndef DISABLE_OPERATINGDIR
-	    if (check_operating_dir(path, FALSE)) {
+	    if (outside_of_confinement(path, FALSE)) {
 		/* TRANSLATORS: This refers to the confining effect of the
 		 * option --operatingdir, not of --restricted. */
-		statusline(ALERT, _("Can't go outside of %s"),
-				full_operating_dir);
+		statusline(ALERT, _("Can't go outside of %s"), operating_dir);
 		path = mallocstrcpy(path, present_path);
 		continue;
 	    }
@@ -283,9 +280,8 @@ char *do_browser(char *path)
 	    /* Note: The selected file can be outside the operating
 	     * directory if it's ".." or if it's a symlink to a
 	     * directory outside the operating directory. */
-	    if (check_operating_dir(filelist[selected], FALSE)) {
-		statusline(ALERT, _("Can't go outside of %s"),
-				full_operating_dir);
+	    if (outside_of_confinement(filelist[selected], FALSE)) {
+		statusline(ALERT, _("Can't go outside of %s"), operating_dir);
 		continue;
 	    }
 #endif
@@ -382,7 +378,7 @@ char *do_browse_from(const char *inpath)
 #ifndef DISABLE_OPERATINGDIR
     /* If the resulting path isn't in the operating directory, use
      * the operating directory instead. */
-    if (check_operating_dir(path, FALSE))
+    if (outside_of_confinement(path, FALSE))
 	path = mallocstrcpy(path, operating_dir);
 #endif
 
@@ -489,8 +485,11 @@ functionptrtype parse_browser_input(int *kbinput)
 	    case 'W':
 	    case 'w':
 	    case '/':
-		return do_search;
+		return do_search_forward;
 	    case 'N':
+#ifndef NANO_TINY
+		return do_findprevious;
+#endif
 	    case 'n':
 		return do_research;
 	}
@@ -539,7 +538,7 @@ void browser_refresh(void)
 	/* If this is the selected item, start its highlighting, and
 	 * remember its location to be able to place the cursor on it. */
 	if (i == selected) {
-	    wattron(edit, hilite_attribute);
+	    wattron(edit, interface_color_pair[SELECTED_TEXT]);
 	    the_row = row;
 	    the_column = col;
 	}
@@ -611,7 +610,7 @@ void browser_refresh(void)
 
 	/* If this is the selected item, finish its highlighting. */
 	if (i == selected)
-	    wattroff(edit, hilite_attribute);
+	    wattroff(edit, interface_color_pair[SELECTED_TEXT]);
 
 	free(info);
 
@@ -700,8 +699,9 @@ int filesearch_init(void)
     return input;
 }
 
-/* Look for the given needle in the list of files. */
-void findnextfile(const char *needle)
+/* Look for the given needle in the list of files.  If forwards is TRUE,
+ * search forward in the list; otherwise, search backward. */
+void findfile(const char *needle, bool forwards)
 {
     size_t looking_at = selected;
 	/* The location in the file list of the filename we're looking at. */
@@ -721,12 +721,16 @@ void findnextfile(const char *needle)
     /* Step through each filename in the list until a match is found or
      * we've come back to the point where we started. */
     while (TRUE) {
-	/* Move to the next filename in the list, or back to the first. */
-	if (looking_at < filelist_len - 1)
-	    looking_at++;
-	else {
-	    looking_at = 0;
-	    statusbar(_("Search Wrapped"));
+	if (forwards) {
+	    if (looking_at++ == filelist_len - 1) {
+		looking_at = 0;
+		statusbar(_("Search Wrapped"));
+	    }
+	} else {
+	    if (looking_at-- == 0) {
+		looking_at = filelist_len - 1;
+		statusbar(_("Search Wrapped"));
+	    }
 	}
 
 	/* Get the bare filename, without the path. */
@@ -773,16 +777,17 @@ void do_filesearch(void)
 	update_history(&search_history, answer);
 #endif
 
-    findnextfile(answer);
+    findfile(answer, TRUE);
 }
 
-/* Search again for the last given filename, without prompting. */
-void do_fileresearch(void)
+/* Search again without prompting for the last given search string,
+ * either forwards or backwards. */
+void do_fileresearch(bool forwards)
 {
     if (*last_search == '\0')
 	statusbar(_("No current search pattern"));
     else
-	findnextfile(last_search);
+	findfile(last_search, forwards);
 }
 
 /* Select the first file in the list. */

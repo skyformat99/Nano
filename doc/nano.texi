@@ -8,8 +8,8 @@
 
 @smallbook
 @set EDITION 0.5
-@set VERSION 2.8.5
-@set UPDATED June 2017
+@set VERSION 2.8.7
+@set UPDATED August 2017
 
 @dircategory Editors
 @direntry
@@ -23,7 +23,7 @@
 @titlepage
 @title GNU @command{nano}
 @subtitle a small and friendly text editor
-@subtitle version 2.8.5
+@subtitle version 2.8.7
 
 @author Chris Allegretta
 @page
@@ -63,7 +63,7 @@ e-mail: @email{chrisa@@asty.org}@*
 @node Top
 @top
 
-This manual documents the GNU @command{nano} editor, version 2.8.5.
+This manual documents the GNU @command{nano} editor, version 2.8.7.
 
 @menu
 * Introduction::
@@ -556,9 +556,9 @@ is running.
 @node Limitation
 @section Limitation
 
-Justifications (@kbd{^J}) and reindentations (@kbd{M-@{} and @kbd{M-@}})
+Justifications (@kbd{^J})
 are not yet covered by the general undo system.  So after a justification
-that is not immediately undone, or after any reindentation, earlier edits
+that is not immediately undone, earlier edits
 cannot be undone any more.  The workaround is, of course, to exit without
 saving.
 
@@ -703,13 +703,14 @@ with @code{set backup} or @option{--backup} or @option{-B}.
 The uniquely numbered files are stored in the specified directory.
 
 @item set backwards
-Do backwards searches by default.
+Obsolete option.  Recognized but ignored.  @code{^Q} is available to
+start a backward search.
 
 @item set boldtext
 Use bold instead of reverse video for the title bar, status bar, key combos,
-function tags, line numbers, and selected text.  This can be overridden for
-the first five by setting the options @code{titlecolor}, @code{statuscolor},
-@code{keycolor}, @code{functioncolor}, and @code{numbercolor}.
+function tags, line numbers, and selected text.  This can be overridden by
+setting the options @code{titlecolor}, @code{statuscolor}, @code{keycolor},
+@code{functioncolor}, @code{numbercolor}, and @code{selectedcolor}.
 
 @item set brackets "@var{string}"
 Set the characters treated as closing brackets when justifying
@@ -744,7 +745,7 @@ Valid names for foreground and background color are:
 @code{white}, @code{black}, @code{blue}, @code{green},
 @code{red}, @code{cyan}, @code{yellow}, and @code{magenta}.
 The name of the foreground color may be prefixed with @code{bright}.
-And either @var{fgcolor} or @var{,bgcolor} may be left out.
+And either @var{fgcolor} or ,@var{bgcolor} may be left out.
 
 @item set historylog
 Enable the use of @file{~/.nano/search_history} for saving and reading
@@ -851,6 +852,10 @@ won't work properly with this option enabled.
 
 @item set regexp
 Do extended regular expression searches by default.
+
+@item set selectedcolor @var{fgcolor},@var{bgcolor}
+Use this color combination for selected text.
+@xref{@code{set functioncolor}} for valid color names.
 
 @item set showcursor
 Put the cursor on the highlighted item in the file browser, to aid
@@ -1083,8 +1088,11 @@ Inserts a file into the current buffer (at the current cursor position),
 or into a new buffer when option @code{multibuffer} is set.
 
 @item whereis
-Searches for text in the current buffer --- or for filenames matching
-a string in the current list in the file browser
+Starts a forward search for text in the current buffer --- or for filenames
+matching a string in the current list in the file browser.
+
+@item wherewas
+Starts a backward search for text in the current buffer.
 
 @item searchagain
 Repeats the last search command without prompting.

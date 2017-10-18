@@ -21,14 +21,12 @@
 
 #include "proto.h"
 
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
+#include <errno.h>
 #ifdef HAVE_PWD_H
 #include <pwd.h>
 #endif
-#include <ctype.h>
-#include <errno.h>
+#include <string.h>
+#include <unistd.h>
 
 /* Return the user's home directory.  We use $HOME, and if that fails,
  * we fall back on the home directory of the effective user ID. */
@@ -181,10 +179,6 @@ const char *fixbounds(const char *r)
     char *r2 = charalloc(strlen(r) * 5);
     char *r3;
 
-#ifdef DEBUG
-    fprintf(stderr, "fixbounds(): Start string = \"%s\"\n", r);
-#endif
-
     for (i = 0; i < strlen(r); i++) {
 	if (r[i] != '\0' && r[i] == '\\' && (r[i + 1] == '>' || r[i + 1] == '<')) {
 	    strcpy(&r2[j], "[[:");
@@ -196,12 +190,11 @@ const char *fixbounds(const char *r)
 	    r2[j] = r[i];
 	j++;
     }
+
     r2[j] = '\0';
     r3 = mallocstrcpy(NULL, r2);
     free(r2);
-#ifdef DEBUG
-    fprintf(stderr, "fixbounds(): Ending string = \"%s\"\n", r3);
-#endif
+
     return (const char *) r3;
 #endif /* !GNU_WORDBOUNDS */
 
