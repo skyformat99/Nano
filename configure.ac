@@ -133,8 +133,13 @@ fi
 
 AC_ARG_ENABLE(histories,
 AS_HELP_STRING([--disable-histories], [Disable search and position histories]))
-if test "x$enable_histories" = xno; then
-    AC_DEFINE(DISABLE_HISTORIES, 1, [Define this to disable search and position histories.])
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_histories" != xyes; then
+	enable_histories=no
+    fi
+fi
+if test "x$enable_histories" != xno; then
+    AC_DEFINE(ENABLE_HISTORIES, 1, [Define this to have search and position histories.])
 fi
 
 AC_ARG_ENABLE(justify,
@@ -193,8 +198,13 @@ fi
 
 AC_ARG_ENABLE(operatingdir,
 AS_HELP_STRING([--disable-operatingdir], [Disable the setting of an operating directory]))
-if test "x$enable_operatingdir" = xno; then
-    AC_DEFINE(DISABLE_OPERATINGDIR, 1, [Define this to disable the setting of an operating directory (a chroot of sorts).])
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_operatingdir" != xyes; then
+	enable_operatingdir=no
+    fi
+fi
+if test "x$enable_operatingdir" != xno; then
+    AC_DEFINE(ENABLE_OPERATINGDIR, 1, [Define this to allow setting an operating directory (a chroot of sorts).])
 fi
 
 AC_ARG_ENABLE(speller,
@@ -229,8 +239,13 @@ fi
 
 AC_ARG_ENABLE(wrapping,
 AS_HELP_STRING([--disable-wrapping], [Disable all hard-wrapping of text]))
-if test "x$enable_wrapping" = xno; then
-    AC_DEFINE(DISABLE_WRAPPING, 1, [Define this to disable all hard text wrapping.])
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_wrapping" != xyes; then
+	enable_wrapping=no
+    fi
+fi
+if test "x$enable_wrapping" != xno; then
+    AC_DEFINE(ENABLE_WRAPPING, 1, [Define this to have hard text wrapping.])
 fi
 
 AC_ARG_ENABLE(wrapping-as-root,
@@ -262,23 +277,14 @@ if test "x$enable_tiny" = xyes; then
     if test "x$enable_extra" != xyes; then
 	AC_DEFINE(DISABLE_EXTRA, 1, [Define this to disable extra stuff.])
     fi
-    if test "x$enable_histories" != xyes; then
-	AC_DEFINE(DISABLE_HISTORIES, 1, [Define this to disable search and position histories.])
-    fi
     if test "x$enable_justify" != xyes; then
 	AC_DEFINE(DISABLE_JUSTIFY, 1, [Define this to disable the justify routines.])
     fi
     if test "x$enable_libmagic" != xyes; then
 	enable_libmagic=no
     fi
-    if test "x$enable_operatingdir" != xyes; then
-	AC_DEFINE(DISABLE_OPERATINGDIR, 1, [Define this to disable the setting of an operating directory (a chroot of sorts).])
-    fi
     if test "x$enable_speller" != xyes; then
 	AC_DEFINE(DISABLE_SPELLER, 1, [Define this to disable the spell-checker functions.])
-    fi
-    if test "x$enable_wrapping" != xyes; then
-	AC_DEFINE(DISABLE_WRAPPING, 1, [Define this to disable all text wrapping.])
     fi
 fi
 

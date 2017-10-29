@@ -137,7 +137,7 @@ extern char *backup_dir;
 extern const char *locking_prefix;
 extern const char *locking_suffix;
 #endif
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 extern char *operating_dir;
 #endif
 
@@ -158,14 +158,14 @@ extern subnfunc *allfuncs;
 extern subnfunc *exitfunc;
 extern subnfunc *uncutfunc;
 
-#ifndef DISABLE_HISTORIES
 extern filestruct *search_history;
+extern filestruct *replace_history;
+extern filestruct *execute_history;
+#ifdef ENABLE_HISTORIES
 extern filestruct *searchtop;
 extern filestruct *searchbot;
-extern filestruct *replace_history;
 extern filestruct *replacetop;
 extern filestruct *replacebot;
-extern filestruct *execute_history;
 extern filestruct *executetop;
 extern filestruct *executebot;
 extern poshiststruct *position_history;
@@ -291,7 +291,7 @@ char *get_next_filename(const char *name, const char *suffix);
 void do_insertfile_void(void);
 char *get_full_path(const char *origpath);
 char *safe_tempfile(FILE **f);
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 void init_operating_dir(void);
 bool outside_of_confinement(const char *currpath, bool allow_tabcomp);
 #endif
@@ -353,7 +353,7 @@ size_t help_line_len(const char *ptr);
 void do_help_void(void);
 
 /* Most functions in history.c. */
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
 void history_init(void);
 void history_reset(const filestruct *h);
 void update_history(filestruct **h, const char *s);
@@ -477,10 +477,7 @@ size_t get_statusbar_page_start(size_t start_col, size_t column);
 void reinit_statusbar_x(void);
 void update_the_statusbar(void);
 int do_prompt(bool allow_tabs, bool allow_files,
-	int menu, const char *curranswer,
-#ifndef DISABLE_HISTORIES
-	filestruct **history_list,
-#endif
+	int menu, const char *curranswer, filestruct **history_list,
 	void (*refresh_func)(void), const char *msg, ...);
 int do_yesno_prompt(bool all, const char *msg);
 
@@ -550,7 +547,7 @@ void add_undo(undo_type action);
 void update_multiline_undo(ssize_t lineno, char *indentation);
 void update_undo(undo_type action);
 #endif /* !NANO_TINY */
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
 void wrap_reset(void);
 bool do_wrap(filestruct *line);
 #endif

@@ -131,10 +131,7 @@ int search_init(bool replacing, bool use_answer)
     /* This is now one simple call.  It just does a lot. */
     i = do_prompt(FALSE, FALSE,
 		inhelp ? MFINDINHELP : (replacing ? MREPLACE : MWHEREIS),
-		backupstring,
-#ifndef DISABLE_HISTORIES
-		&search_history,
-#endif
+		backupstring, &search_history,
 		/* TRANSLATORS: This is the main search prompt. */
 		edit_refresh, "%s%s%s%s%s%s", _("Search"),
 		/* TRANSLATORS: The next three modify the search prompt. */
@@ -165,7 +162,7 @@ int search_init(bool replacing, bool use_answer)
 	/* If an answer was given, remember it. */
 	if (*answer != '\0') {
 	    last_search = mallocstrcpy(last_search, answer);
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
 	    update_history(&search_history, answer);
 #endif
 	}
@@ -406,7 +403,7 @@ void do_findnext(void)
 /* Search for the last string without prompting. */
 void do_research(void)
 {
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     /* If nothing was searched for yet during this run of nano, but
      * there is a search history, take the most recent item. */
     if (*last_search == '\0' && searchbot->prev != NULL)
@@ -747,14 +744,11 @@ void do_replace(void)
     if (i != 0)
 	return;
 
-    i = do_prompt(FALSE, FALSE, MREPLACEWITH, NULL,
-#ifndef DISABLE_HISTORIES
-		&replace_history,
-#endif
+    i = do_prompt(FALSE, FALSE, MREPLACEWITH, NULL, &replace_history,
 		/* TRANSLATORS: This is a prompt. */
 		edit_refresh, _("Replace with"));
 
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     /* If the replace string is not "", add it to the replace history list. */
     if (i == 0)
 	update_history(&replace_history, answer);
@@ -815,10 +809,7 @@ void do_gotolinecolumn(ssize_t line, ssize_t column, bool use_answer,
 
 	/* Ask for the line and column. */
 	int i = do_prompt(FALSE, FALSE, MGOTOLINE,
-		use_answer ? answer : NULL,
-#ifndef DISABLE_HISTORIES
-		NULL,
-#endif
+		use_answer ? answer : NULL, NULL,
 		/* TRANSLATORS: This is a prompt. */
 		edit_refresh, _("Enter line number, column number"));
 

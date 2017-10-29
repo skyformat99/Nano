@@ -422,7 +422,7 @@ bool open_buffer(const char *filename, bool undoable)
     /* Display newlines in filenames as ^J. */
     as_an_at = FALSE;
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
     if (outside_of_confinement(filename, FALSE)) {
 	statusline(ALERT, _("Can't read file from outside of %s"),
 				operating_dir);
@@ -647,7 +647,7 @@ bool close_buffer(void)
     if (openfile == openfile->next)
 	return FALSE;
 
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     if (ISSET(POS_HISTORY))
 	update_poshistory(openfile->filename,
 			openfile->current->lineno, xplustabs() + 1);
@@ -1065,11 +1065,11 @@ void do_insertfile(void)
 		execute ? MEXTCMD :
 #endif
 		MINSERTFILE, given,
-#ifndef DISABLE_HISTORIES
-		execute ? &execute_history : NULL,
+#ifndef NANO_TINY
+		execute ? &execute_history :
 #endif
-		edit_refresh, msg,
-#ifndef DISABLE_OPERATINGDIR
+		NULL, edit_refresh, msg,
+#ifdef ENABLE_OPERATINGDIR
 		operating_dir != NULL ? operating_dir :
 #endif
 		"./");
@@ -1127,11 +1127,14 @@ void do_insertfile(void)
 		if (ISSET(MULTIBUFFER))
 		    open_buffer("", FALSE);
 #endif
-		/* Save the command's output in the current buffer. */
-		execute_command(answer);
-#ifndef DISABLE_HISTORIES
-		update_history(&execute_history, answer);
+		/* If the command is not empty, execute it and read its output
+		 * into the buffer, and add the command to the history list. */
+		if (*answer != '\0') {
+		    execute_command(answer);
+#ifdef ENABLE_HISTORIES
+		    update_history(&execute_history, answer);
 #endif
+		}
 
 #ifdef ENABLE_MULTIBUFFER
 		/* If this is a new buffer, put the cursor at the top. */
@@ -1156,7 +1159,7 @@ void do_insertfile(void)
 
 #ifdef ENABLE_MULTIBUFFER
 	    if (ISSET(MULTIBUFFER)) {
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
 		if (ISSET(POS_HISTORY)) {
 		    ssize_t priorline, priorcol;
 #ifndef NANO_TINY
@@ -1165,7 +1168,7 @@ void do_insertfile(void)
 		    if (has_old_position(answer, &priorline, &priorcol))
 			do_gotolinecolumn(priorline, priorcol, FALSE, FALSE);
 		}
-#endif /* !DISABLE_HISTORIES */
+#endif /* ENABLE_HISTORIES */
 		/* Update stuff to account for the current buffer. */
 		prepare_for_display();
 	    } else
@@ -1398,7 +1401,7 @@ char *safe_tempfile(FILE **f)
     return full_tempdir;
 }
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 /* Change to the specified operating directory, when it's valid. */
 void init_operating_dir(void)
 {
@@ -1561,7 +1564,7 @@ bool write_file(const char *name, FILE *f_open, bool tmp,
 
     realname = real_dir_from_tilde(name);
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
     /* If we're writing a temporary file, we're probably going outside
      * the operating directory, so skip the operating directory test. */
     if (!tmp && outside_of_confinement(realname, FALSE)) {
@@ -2076,10 +2079,7 @@ int do_writeout(bool exiting, bool withprompt)
 	    /* Ask for (confirmation of) the filename.  Disable tab completion
 	     * when using restricted mode and the filename isn't blank. */
 	    i = do_prompt(!ISSET(RESTRICTED) || openfile->filename[0] == '\0',
-			TRUE, MWRITEFILE, given,
-#ifndef DISABLE_HISTORIES
-			NULL,
-#endif
+			TRUE, MWRITEFILE, given, NULL,
 			edit_refresh, "%s%s%s", msg,
 #ifndef NANO_TINY
 			formatstr, backupstr
@@ -2418,7 +2418,7 @@ char **username_tab_completion(const char *buf, size_t *num_matches,
 	    /* Cool, found a match.  Add it to the list.  This makes a
 	     * lot more sense to me (Chris) this way... */
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	    /* ...unless the match exists outside the operating
 	     * directory, in which case just go to the next match. */
 	    if (outside_of_confinement(userdata->pw_dir, TRUE))
@@ -2501,7 +2501,7 @@ char **cwd_tab_completion(const char *buf, bool allow_files, size_t
 	    char *tmp = charalloc(strlen(dirname) + strlen(nextdir->d_name) + 1);
 	    sprintf(tmp, "%s%s", dirname, nextdir->d_name);
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	    /* ...unless the match exists outside the operating
 	     * directory, in which case just go to the next match. */
 	    skip_match = outside_of_confinement(tmp, TRUE);

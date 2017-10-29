@@ -225,10 +225,7 @@ char *do_browser(char *path)
 	    selected = filelist_len - 1;
 	} else if (func == goto_dir_void) {
 	    /* Ask for the directory to go to. */
-	    int i = do_prompt(TRUE, FALSE, MGOTODIR, NULL,
-#ifndef DISABLE_HISTORIES
-			NULL,
-#endif
+	    int i = do_prompt(TRUE, FALSE, MGOTODIR, NULL, NULL,
 			/* TRANSLATORS: This is a prompt. */
 			browser_refresh, _("Go To Directory"));
 
@@ -246,7 +243,7 @@ char *do_browser(char *path)
 		sprintf(path, "%s%s", present_path, answer);
 	    }
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	    if (outside_of_confinement(path, FALSE)) {
 		/* TRANSLATORS: This refers to the confining effect of the
 		 * option --operatingdir, not of --restricted. */
@@ -276,7 +273,7 @@ char *do_browser(char *path)
 		continue;
 	    }
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	    /* Note: The selected file can be outside the operating
 	     * directory if it's ".." or if it's a symlink to a
 	     * directory outside the operating directory. */
@@ -375,7 +372,7 @@ char *do_browse_from(const char *inpath)
 	}
     }
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
     /* If the resulting path isn't in the operating directory, use
      * the operating directory instead. */
     if (outside_of_confinement(path, FALSE))
@@ -679,10 +676,7 @@ int filesearch_init(void)
 	buf = mallocstrcpy(NULL, "");
 
     /* This is now one simple call.  It just does a lot. */
-    input = do_prompt(FALSE, FALSE, MWHEREISFILE, NULL,
-#ifndef DISABLE_HISTORIES
-		&search_history,
-#endif
+    input = do_prompt(FALSE, FALSE, MWHEREISFILE, NULL, &search_history,
 		browser_refresh, "%s%s", _("Search"), buf);
 
     /* Release buf now that we don't need it anymore. */
@@ -771,7 +765,7 @@ void do_filesearch(void)
     else
 	last_search = mallocstrcpy(last_search, answer);
 
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     /* If answer is not empty, add the string to the search history list. */
     if (*answer != '\0')
 	update_history(&search_history, answer);

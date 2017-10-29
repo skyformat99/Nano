@@ -564,7 +564,7 @@ void finish(void)
     /* Restore the old terminal settings. */
     tcsetattr(0, TCSANOW, &oldterm);
 
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     /* If the user wants history persistence, write the relevant files. */
     if (ISSET(HISTORYLOG))
 	save_history();
@@ -807,7 +807,7 @@ void usage(void)
 #ifndef NANO_TINY
     print_opt("-G", "--locking", N_("Use (vim-style) lock files"));
 #endif
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     if (!ISSET(RESTRICTED))
 	print_opt("-H", "--historylog",
 		N_("Log & read search/replace string history"));
@@ -825,7 +825,7 @@ void usage(void)
 	N_("Don't convert files from DOS/Mac format"));
 #endif
     print_opt("-O", "--morespace", N_("Use one more line for editing"));
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     if (!ISSET(RESTRICTED))
 	print_opt("-P", "--positionlog",
 		N_("Log & read location of cursor position"));
@@ -875,7 +875,7 @@ void usage(void)
     print_opt("-m", "--mouse", N_("Enable the use of the mouse"));
 #endif
     print_opt("-n", "--noread", N_("Do not read the file (only write it)"));
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
     print_opt(_("-o <dir>"), _("--operatingdir=<dir>"),
 	N_("Set operating directory"));
 #endif
@@ -899,7 +899,7 @@ void usage(void)
     print_opt("-u", "--unix", N_("Save a file by default in Unix format"));
 #endif
     print_opt("-v", "--view", N_("View mode (read-only)"));
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
     print_opt("-w", "--nowrap", N_("Don't hard-wrap long lines"));
 #endif
     print_opt("-x", "--nohelp", N_("Don't show the two help lines"));
@@ -939,7 +939,7 @@ void version(void)
 #ifdef ENABLE_HELP
     printf(" --enable-help");
 #endif
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     printf(" --enable-histories");
 #endif
 #ifndef DISABLE_JUSTIFY
@@ -960,7 +960,7 @@ void version(void)
 #ifdef ENABLE_MULTIBUFFER
     printf(" --enable-multibuffer");
 #endif
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
     printf(" --enable-operatingdir");
 #endif
 #ifndef DISABLE_SPELLER
@@ -969,7 +969,7 @@ void version(void)
 #ifdef ENABLE_TABCOMP
     printf(" --enable-tabcomp");
 #endif
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
     printf(" --enable-wrapping");
 #endif
 #else /* !NANO_TINY */
@@ -988,7 +988,7 @@ void version(void)
 #ifndef ENABLE_HELP
     printf(" --disable-help");
 #endif
-#ifdef DISABLE_HISTORIES
+#ifndef ENABLE_HISTORIES
     printf(" --disable-histories");
 #endif
 #ifdef DISABLE_JUSTIFY
@@ -1009,7 +1009,7 @@ void version(void)
 #ifndef ENABLE_NANORC
     printf(" --disable-nanorc");
 #endif
-#ifdef DISABLE_OPERATINGDIR
+#ifndef ENABLE_OPERATINGDIR
     printf(" --disable-operatingdir");
 #endif
 #ifdef DISABLE_SPELLER
@@ -1021,7 +1021,7 @@ void version(void)
 #ifndef ENABLE_WORDCOMPLETION
     printf(" --disable-wordcomp");
 #endif
-#ifdef DISABLE_WRAPPING
+#ifndef ENABLE_WRAPPING
     printf(" --disable-wrapping");
 #endif
 #endif /* !NANO_TINY */
@@ -1643,7 +1643,7 @@ int do_input(bool allow_funcs)
      * all available characters in the input puddle.  Note that this
      * puddle will be empty if we're in view mode. */
     if (have_shortcut || get_key_buffer_len() == 0) {
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
 	/* If we got a shortcut or toggle, and it's not the shortcut
 	 * for verbatim input, turn off prepending of wrapped text. */
 	if (have_shortcut && s->scfunc != do_verbatim_input)
@@ -1861,7 +1861,7 @@ void do_output(char *output, size_t output_len, bool allow_cntrls)
 	update_undo(ADD);
 #endif
 
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
 	/* If text gets wrapped, the edit window needs a refresh. */
 	if (!ISSET(NO_WRAP) && do_wrap(openfile->current))
 	    refresh_needed = TRUE;
@@ -1896,7 +1896,7 @@ int main(int argc, char **argv)
 #ifndef DISABLE_WRAPJUSTIFY
     bool fill_used = FALSE;
 	/* Was the fill option used on the command line? */
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
     bool forced_wrapping = FALSE;
 	/* Should long lines be automatically hard wrapped? */
 #endif
@@ -1940,7 +1940,7 @@ int main(int argc, char **argv)
 	{"mouse", 0, NULL, 'm'},
 #endif
 	{"noread", 0, NULL, 'n'},
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	{"operatingdir", 1, NULL, 'o'},
 #endif
 	{"preserve", 0, NULL, 'p'},
@@ -1953,7 +1953,7 @@ int main(int argc, char **argv)
 #endif
 	{"tempfile", 0, NULL, 't'},
 	{"view", 0, NULL, 'v'},
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
 	{"nowrap", 0, NULL, 'w'},
 #endif
 	{"nohelp", 0, NULL, 'x'},
@@ -2059,7 +2059,7 @@ int main(int argc, char **argv)
 		SET(LOCKING);
 		break;
 #endif
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
 	    case 'H':
 		SET(HISTORYLOG);
 		break;
@@ -2083,7 +2083,7 @@ int main(int argc, char **argv)
 	    case 'O':
 		SET(MORE_SPACE);
 		break;
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
 	    case 'P':
 		SET(POS_HISTORY);
 		break;
@@ -2157,7 +2157,7 @@ int main(int argc, char **argv)
 	    case 'n':
 		SET(NOREAD_MODE);
 		break;
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	    case 'o':
 		operating_dir = mallocstrcpy(operating_dir, optarg);
 		break;
@@ -2178,7 +2178,7 @@ int main(int argc, char **argv)
 		    exit(1);
 		}
 		fill_used = TRUE;
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
 		forced_wrapping = TRUE;
 #endif
 		break;
@@ -2199,7 +2199,7 @@ int main(int argc, char **argv)
 	    case 'v':
 		SET(VIEW_MODE);
 		break;
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
 	    case 'w':
 		SET(NO_WRAP);
 		/* If both --fill and --nowrap are given on the
@@ -2252,7 +2252,7 @@ int main(int argc, char **argv)
 #ifdef ENABLE_NANORC
     if (!no_rcfiles) {
 	/* Back up the command-line options, then read the rcfile(s). */
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	char *operating_dir_cpy = operating_dir;
 #endif
 #ifndef DISABLE_WRAPJUSTIFY
@@ -2274,7 +2274,7 @@ int main(int argc, char **argv)
 
 	memcpy(flags_cpy, flags, sizeof(flags_cpy));
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	operating_dir = NULL;
 #endif
 #ifndef NANO_TINY
@@ -2296,7 +2296,7 @@ int main(int argc, char **argv)
 #endif
 
 	/* If the backed-up command-line options have a value, restore them. */
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
 	if (operating_dir_cpy != NULL) {
 	    free(operating_dir);
 	    operating_dir = operating_dir_cpy;
@@ -2343,7 +2343,7 @@ int main(int argc, char **argv)
 #endif
 #endif /* ENABLE_NANORC */
 
-#ifndef DISABLE_WRAPPING
+#ifdef ENABLE_WRAPPING
     /* Override a "set nowrap" in an rcfile (or a --disable-wrapping-as-root)
      * if --fill was given on the command line and not undone by --nowrap. */
     if (forced_wrapping)
@@ -2354,7 +2354,7 @@ int main(int argc, char **argv)
     if (ISSET(BOLD_TEXT))
 	hilite_attribute = A_BOLD;
 
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
     /* Initialize the pointers for the Search/Replace/Execute histories. */
     history_init();
 
@@ -2373,7 +2373,7 @@ int main(int argc, char **argv)
 	load_history();
     if (ISSET(POS_HISTORY))
 	load_poshistory();
-#endif /* !DISABLE_HISTORIES */
+#endif /* ENABLE_HISTORIES */
 
 #ifndef NANO_TINY
     /* If backups are enabled and a backup directory was specified and
@@ -2383,7 +2383,7 @@ int main(int argc, char **argv)
 	init_backup_dir();
 #endif
 
-#ifndef DISABLE_OPERATINGDIR
+#ifdef ENABLE_OPERATINGDIR
     /* Set up the operating directory.  This entails chdir()ing there,
      * so that file reads and writes will be based there. */
     if (operating_dir != NULL)
@@ -2567,7 +2567,7 @@ int main(int argc, char **argv)
 	/* If a position was given on the command line, go there. */
 	if (givenline != 0 || givencol != 0)
 	    do_gotolinecolumn(givenline, givencol, FALSE, FALSE);
-#ifndef DISABLE_HISTORIES
+#ifdef ENABLE_HISTORIES
 	else if (ISSET(POS_HISTORY) && openfile->filename[0] != '\0') {
 	    ssize_t savedline, savedcol;
 	    /* If edited before, restore the last cursor position. */
