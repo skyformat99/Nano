@@ -53,6 +53,18 @@ void get_homedir(void)
     }
 }
 
+/* Return a copy of the two given strings, welded together. */
+char *concatenate(const char *path, const char *name)
+{
+    size_t pathlen = strlen(path);
+    char *joined = charalloc(pathlen + strlen(name) + 1);
+
+    strcpy(joined, path);
+    strcpy(joined + pathlen, name);
+
+    return joined;
+}
+
 #ifdef ENABLE_LINENUMBERS
 /* Return the number of digits that the given integer n takes up. */
 int digits(ssize_t n)
@@ -201,7 +213,7 @@ const char *fixbounds(const char *r)
     return r;
 }
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 /* Is the word starting at the given position in buf and of the given length
  * a separate word?  That is: is it not part of a longer word?*/
 bool is_separate_word(size_t position, size_t length, const char *buf)
@@ -219,7 +231,7 @@ bool is_separate_word(size_t position, size_t length, const char *buf)
     return ((position == 0 || !is_alpha_mbchar(before)) &&
 		(buf[word_end] == '\0' || !is_alpha_mbchar(after)));
 }
-#endif /* !DISABLE_SPELLER */
+#endif /* ENABLE_SPELLER */
 
 /* Return the position of the needle in the haystack, or NULL if not found.
  * When searching backwards, we will find the last match that starts no later

@@ -39,7 +39,7 @@ static pid_t pid = -1;
 static bool prepend_wrap = FALSE;
 	/* Should we prepend wrapped text to the next line? */
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 static filestruct *jusbuffer = NULL;
 	/* The buffer where we store unjustified text. */
 static filestruct *jusbottom = NULL;
@@ -73,7 +73,7 @@ void do_mark(void)
 }
 #endif /* !NANO_TINY */
 
-#if !defined(DISABLE_COLOR) || !defined(DISABLE_SPELLER)
+#if defined(ENABLE_COLOR) || defined(ENABLE_SPELLER)
 /* Return an error message containing the given name. */
 char *invocation_error(const char *name)
 {
@@ -501,7 +501,7 @@ void do_comment(void)
     size_t top_x, bot_x;
     bool empty, all_empty = TRUE;
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     if (openfile->syntax)
 	comment_seq = openfile->syntax->comment;
 
@@ -1668,7 +1668,7 @@ bool do_wrap(filestruct *line)
 }
 #endif /* ENABLE_WRAPPING */
 
-#if defined(ENABLE_HELP) || !defined(DISABLE_WRAPJUSTIFY)
+#if defined(ENABLE_HELP) || defined(ENABLED_WRAPORJUSTIFY)
 /* We are trying to break a chunk off line.  We find the last blank such
  * that the display length to there is at most (goal + 1).  If there is
  * no such blank, then we find the first blank.  We then take the last
@@ -1740,9 +1740,9 @@ ssize_t break_line(const char *line, ssize_t goal, bool snap_at_nl)
 
     return lastblank;
 }
-#endif /* ENABLE_HELP || !DISABLE_WRAPJUSTIFY */
+#endif /* ENABLE_HELP || ENABLED_WRAPORJUSTIFY */
 
-#if !defined(NANO_TINY) || !defined(DISABLE_JUSTIFY)
+#if !defined(NANO_TINY) || defined(ENABLE_JUSTIFY)
 /* The "indentation" of a line is the whitespace between the quote part
  * and the non-whitespace of the line. */
 size_t indent_length(const char *line)
@@ -1763,9 +1763,9 @@ size_t indent_length(const char *line)
 
     return len;
 }
-#endif /* !NANO_TINY || !DISABLE_JUSTIFY */
+#endif /* !NANO_TINY || ENABLE_JUSTIFY */
 
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 /* justify_format() replaces blanks with spaces and multiple spaces by 1
  * (except it maintains up to 2 after a character in punct optionally
  * followed by a character in brackets, and removes all from the end).
@@ -2556,9 +2556,9 @@ void do_full_justify(void)
 {
     do_justify(TRUE);
 }
-#endif /* !DISABLE_JUSTIFY */
+#endif /* ENABLE_JUSTIFY */
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 /* A word is misspelled in the file.  Let the user replace it.  We
  * return FALSE if the user cancels. */
 bool do_int_spell_fix(const char *word)
@@ -3049,9 +3049,9 @@ void do_spell(void)
     } else
 	statusbar(_("Finished checking spelling"));
 }
-#endif /* !DISABLE_SPELLER */
+#endif /* ENABLE_SPELLER */
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 /* Run a linting program on the current buffer.  Return NULL for normal
  * termination, and the error string otherwise. */
 void do_linter(void)
@@ -3373,7 +3373,7 @@ void do_linter(void)
     }
 }
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 /* Run a formatter for the current syntax.  This expects the formatter
  * to be non-interactive and operate on a file in-place, which we'll
  * pass it on the command line. */
@@ -3497,8 +3497,8 @@ void do_formatter(void)
     /* If there were any messages, clear them off. */
     total_refresh();
 }
-#endif /* !DISABLE_SPELLER */
-#endif /* !DISABLE_COLOR */
+#endif /* ENABLE_SPELLER */
+#endif /* ENABLE_COLOR */
 
 #ifndef NANO_TINY
 /* Our own version of "wc".  Note that its character counts are in

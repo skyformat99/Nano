@@ -273,7 +273,7 @@ int findnextstr(const char *needle, bool whole_word_only, int modus,
 	    /* When doing a regex search, compute the length of the match. */
 	    if (ISSET(USE_REGEXP))
 		found_len = regmatches[0].rm_eo - regmatches[0].rm_so;
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	    /* When we're spell checking, a match should be a separate word;
 	     * if it's not, continue looking in the rest of the line. */
 	    if (whole_word_only && !is_separate_word(found - line->data,
@@ -683,7 +683,7 @@ ssize_t do_replace_loop(const char *needle, bool whole_word_only,
 	    openfile->current->data = copy;
 
 	    if (!replaceall) {
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 		/* When doing syntax coloring, the replacement might require
 		 * a change of colors, so refresh the whole edit window. */
 		if (openfile->colorstrings != NULL && !ISSET(NO_COLOR_SYNTAX))
@@ -701,7 +701,7 @@ ssize_t do_replace_loop(const char *needle, bool whole_word_only,
 
     if (numreplaced == -1)
 	not_found_msg(needle);
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     else if (numreplaced > 0)
 	refresh_needed = TRUE;
 #endif

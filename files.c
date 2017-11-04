@@ -107,7 +107,7 @@ void make_new_buffer(void)
     openfile->current_stat = NULL;
     openfile->lock_filename = NULL;
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     openfile->syntax = NULL;
     openfile->colorstrings = NULL;
 #endif
@@ -496,7 +496,7 @@ bool open_buffer(const char *filename, bool undoable)
 	openfile->placewewant = 0;
     }
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     /* If we're loading into a new buffer, update the colors to account
      * for it, if applicable. */
     if (new_buffer)
@@ -506,7 +506,7 @@ bool open_buffer(const char *filename, bool undoable)
     return TRUE;
 }
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 /* Open the specified file, and if that succeeds, blow away the text of
  * the current buffer and read the file contents into its place. */
 void replace_buffer(const char *filename)
@@ -564,7 +564,7 @@ void replace_marked_buffer(const char *filename, filestruct *top, size_t top_x,
 	UNSET(NO_NEWLINES);
 }
 #endif /* !NANO_TINY */
-#endif /* !DISABLE_SPELLER */
+#endif /* ENABLE_SPELLER */
 
 /* Update the titlebar and the multiline cache to match the current buffer. */
 void prepare_for_display(void)
@@ -573,7 +573,7 @@ void prepare_for_display(void)
     if (!inhelp)
 	titlebar(NULL);
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     /* If there are multiline coloring regexes, and there is no
      * multiline cache data yet, precalculate it now. */
     if (openfile->syntax && openfile->syntax->nmultis > 0 &&
@@ -1922,14 +1922,14 @@ bool write_file(const char *name, FILE *f_open, bool tmp,
     if (method == OVERWRITE && !tmp) {
 	/* If we must set the filename, and it changed, adjust things. */
 	if (!nonamechange && strcmp(openfile->filename, realname) != 0) {
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	    const char *oldname, *newname;
 
 	    oldname = openfile->syntax ? openfile->syntax->name : "";
 #endif
 	    openfile->filename = mallocstrcpy(openfile->filename, realname);
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	    /* See if the applicable syntax has changed. */
 	    color_update();
 	    color_init();
@@ -2030,7 +2030,7 @@ int do_writeout(bool exiting, bool withprompt)
 	/* The filename we offer, or what the user typed so far. */
     bool maychange = (openfile->filename[0] == '\0');
 	/* Whether it's okay to save the file under a different name. */
-#ifndef DISABLE_EXTRA
+#ifdef ENABLE_EXTRA
     static bool did_credits = FALSE;
 #endif
 
@@ -2139,7 +2139,7 @@ int do_writeout(bool exiting, bool withprompt)
 		continue;
 	    }
 
-#ifndef DISABLE_EXTRA
+#ifdef ENABLE_EXTRA
 	    /* If the current file has been modified, we've pressed
 	     * Ctrl-X at the edit window to exit, we've pressed "y" at
 	     * the "Save modified buffer" prompt to save, we've entered

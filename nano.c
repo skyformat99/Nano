@@ -71,7 +71,7 @@ filestruct *make_new_node(filestruct *prevnode)
     newnode->next = NULL;
     newnode->lineno = (prevnode != NULL) ? prevnode->lineno + 1 : 1;
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     newnode->multidata = NULL;
 #endif
 
@@ -88,7 +88,7 @@ filestruct *copy_node(const filestruct *src)
     dst->prev = src->prev;
     dst->lineno = src->lineno;
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     dst->multidata = NULL;
 #endif
 
@@ -128,7 +128,7 @@ void unlink_node(filestruct *fileptr)
 void delete_node(filestruct *fileptr)
 {
     free(fileptr->data);
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     free(fileptr->multidata);
 #endif
     free(fileptr);
@@ -721,7 +721,7 @@ void window_init(void)
 	keypad(bottomwin, TRUE);
     }
 
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
     /* Set up the wrapping point, accounting for screen width when negative. */
     fill = wrap_at;
     if (fill <= 0)
@@ -830,7 +830,7 @@ void usage(void)
 	print_opt("-P", "--positionlog",
 		N_("Log & read location of cursor position"));
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     print_opt(_("-Q <str>"), _("--quotestr=<str>"), N_("Quoting string"));
 #endif
     if (!ISSET(RESTRICTED))
@@ -848,7 +848,7 @@ void usage(void)
     print_opt(_("-X <str>"), _("--wordchars=<str>"),
 	N_("Which other characters are word parts"));
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     if (!ISSET(RESTRICTED))
 	print_opt(_("-Y <name>"), _("--syntax=<name>"),
 		N_("Syntax definition to use for coloring"));
@@ -880,16 +880,11 @@ void usage(void)
 	N_("Set operating directory"));
 #endif
     print_opt("-p", "--preserve", N_("Preserve XON (^Q) and XOFF (^S) keys"));
-#ifdef ENABLE_NANORC
-    if (!ISSET(RESTRICTED))
-	print_opt("-q", "--quiet",
-		N_("Silently ignore startup issues like rc file errors"));
-#endif
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
     print_opt(_("-r <#cols>"), _("--fill=<#cols>"),
 	N_("Set hard-wrapping point at column #cols"));
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     if (!ISSET(RESTRICTED))
 	print_opt(_("-s <prog>"), _("--speller=<prog>"),
 		N_("Enable alternate speller"));
@@ -930,10 +925,10 @@ void version(void)
 #ifdef ENABLE_BROWSER
     printf(" --enable-browser");
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     printf(" --enable-color");
 #endif
-#ifndef DISABLE_EXTRA
+#ifdef ENABLE_EXTRA
     printf(" --enable-extra");
 #endif
 #ifdef ENABLE_HELP
@@ -942,7 +937,7 @@ void version(void)
 #ifdef ENABLE_HISTORIES
     printf(" --enable-histories");
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     printf(" --enable-justify");
 #endif
 #ifdef HAVE_LIBMAGIC
@@ -963,7 +958,7 @@ void version(void)
 #ifdef ENABLE_OPERATINGDIR
     printf(" --enable-operatingdir");
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     printf(" --enable-speller");
 #endif
 #ifdef ENABLE_TABCOMP
@@ -976,13 +971,13 @@ void version(void)
 #ifndef ENABLE_BROWSER
     printf(" --disable-browser");
 #endif
-#ifdef DISABLE_COLOR
+#ifndef ENABLE_COLOR
     printf(" --disable-color");
 #endif
 #ifndef ENABLE_COMMENT
     printf(" --disable-comment");
 #endif
-#ifdef DISABLE_EXTRA
+#ifndef ENABLE_EXTRA
     printf(" --disable-extra");
 #endif
 #ifndef ENABLE_HELP
@@ -991,7 +986,7 @@ void version(void)
 #ifndef ENABLE_HISTORIES
     printf(" --disable-histories");
 #endif
-#ifdef DISABLE_JUSTIFY
+#ifndef ENABLE_JUSTIFY
     printf(" --disable-justify");
 #endif
 #ifndef HAVE_LIBMAGIC
@@ -1012,7 +1007,7 @@ void version(void)
 #ifndef ENABLE_OPERATINGDIR
     printf(" --disable-operatingdir");
 #endif
-#ifdef DISABLE_SPELLER
+#ifndef ENABLE_SPELLER
     printf(" --disable-speller");
 #endif
 #ifndef ENABLE_TABCOMP
@@ -1401,7 +1396,7 @@ void do_toggle(int flag)
 	    break;
 	case WHITESPACE_DISPLAY:
 	    titlebar(NULL);	/* Fall through. */
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	case NO_COLOR_SYNTAX:
 #endif
 	    refresh_needed = TRUE;
@@ -1714,7 +1709,7 @@ int do_input(bool allow_funcs)
 		refresh_needed = TRUE;
 	    }
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	    if (f && !f->viewok)
 		check_the_multis(openfile->current);
 #endif
@@ -1882,7 +1877,7 @@ void do_output(char *output, size_t output_len, bool allow_cntrls)
 
     openfile->placewewant = xplustabs();
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     check_the_multis(openfile->current);
 #endif
 
@@ -1893,13 +1888,13 @@ void do_output(char *output, size_t output_len, bool allow_cntrls)
 int main(int argc, char **argv)
 {
     int optchr;
-#ifndef DISABLE_WRAPJUSTIFY
+#if defined(ENABLED_WRAPORJUSTIFY) && defined(ENABLE_NANORC)
     bool fill_used = FALSE;
 	/* Was the fill option used on the command line? */
+#endif
 #ifdef ENABLE_WRAPPING
     bool forced_wrapping = FALSE;
 	/* Should long lines be automatically hard wrapped? */
-#endif
 #endif
 #ifdef ENABLE_MULTIBUFFER
     bool is_multibuffer;
@@ -1917,14 +1912,14 @@ int main(int argc, char **argv)
 	{"rebindkeypad", 0, NULL, 'K'},
 	{"nonewlines", 0, NULL, 'L'},
 	{"morespace", 0, NULL, 'O'},
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	{"quotestr", 1, NULL, 'Q'},
 #endif
 	{"restricted", 0, NULL, 'R'},
 	{"tabsize", 1, NULL, 'T'},
 	{"quickblank", 0, NULL, 'U'},
 	{"version", 0, NULL, 'V'},
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	{"syntax", 1, NULL, 'Y'},
 #endif
 	{"constantshow", 0, NULL, 'c'},
@@ -1945,10 +1940,10 @@ int main(int argc, char **argv)
 #endif
 	{"preserve", 0, NULL, 'p'},
 	{"quiet", 0, NULL, 'q'},
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
 	{"fill", 1, NULL, 'r'},
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	{"speller", 1, NULL, 's'},
 #endif
 	{"tempfile", 0, NULL, 't'},
@@ -2088,7 +2083,7 @@ int main(int argc, char **argv)
 		SET(POS_HISTORY);
 		break;
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	    case 'Q':
 		quotestr = mallocstrcpy(quotestr, optarg);
 		break;
@@ -2122,7 +2117,7 @@ int main(int argc, char **argv)
 		word_chars = mallocstrcpy(word_chars, optarg);
 		break;
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	    case 'Y':
 		syntaxstr = mallocstrcpy(syntaxstr, optarg);
 		break;
@@ -2166,24 +2161,25 @@ int main(int argc, char **argv)
 		SET(PRESERVE);
 		break;
 #ifdef ENABLE_NANORC
-	    case 'q':
-		SET(QUIET);
+	    case 'q':  /* obsolete, ignored */
 		break;
 #endif
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
 	    case 'r':
 		if (!parse_num(optarg, &wrap_at)) {
 		    fprintf(stderr, _("Requested fill size \"%s\" is invalid"), optarg);
 		    fprintf(stderr, "\n");
 		    exit(1);
 		}
+#ifdef ENABLE_NANORC
 		fill_used = TRUE;
+#endif
 #ifdef ENABLE_WRAPPING
 		forced_wrapping = TRUE;
 #endif
 		break;
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	    case 's':
 		alt_speller = mallocstrcpy(alt_speller, optarg);
 		break;
@@ -2255,17 +2251,17 @@ int main(int argc, char **argv)
 #ifdef ENABLE_OPERATINGDIR
 	char *operating_dir_cpy = operating_dir;
 #endif
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
 	ssize_t wrap_at_cpy = wrap_at;
 #endif
 #ifndef NANO_TINY
 	char *backup_dir_cpy = backup_dir;
 	char *word_chars_cpy = word_chars;
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	char *quotestr_cpy = quotestr;
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	char *alt_speller_cpy = alt_speller;
 #endif
 	ssize_t tabsize_cpy = tabsize;
@@ -2281,10 +2277,10 @@ int main(int argc, char **argv)
 	backup_dir = NULL;
 	word_chars = NULL;
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	quotestr = NULL;
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	alt_speller = NULL;
 #endif
 
@@ -2302,7 +2298,7 @@ int main(int argc, char **argv)
 	    operating_dir = operating_dir_cpy;
 	}
 #endif
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
 	if (fill_used)
 	    wrap_at = wrap_at_cpy;
 #endif
@@ -2316,13 +2312,13 @@ int main(int argc, char **argv)
 	    word_chars = word_chars_cpy;
 	}
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	if (quotestr_cpy != NULL) {
 	    free(quotestr);
 	    quotestr = quotestr_cpy;
 	}
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	if (alt_speller_cpy != NULL) {
 	    free(alt_speller);
 	    alt_speller = alt_speller_cpy;
@@ -2361,8 +2357,7 @@ int main(int argc, char **argv)
     /* If we need any of the history files, verify that the user's home
      * directory and its .nano subdirctory exist. */
     if (ISSET(HISTORYLOG) || ISSET(POS_HISTORY)) {
-	get_homedir();
-	if (homedir == NULL || !have_dotnano()) {
+	if (!have_statedir()) {
 	    UNSET(HISTORYLOG);
 	    UNSET(POS_HISTORY);
 	}
@@ -2390,7 +2385,7 @@ int main(int argc, char **argv)
 	init_operating_dir();
 #endif
 
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     /* If punct wasn't specified, set its default value. */
     if (punct == NULL)
 	punct = mallocstrcpy(NULL, "!.?");
@@ -2414,9 +2409,9 @@ int main(int argc, char **argv)
 	quoteerr = charalloc(size);
 	regerror(quoterc, &quotereg, quoteerr, size);
     }
-#endif /* !DISABLE_JUSTIFY */
+#endif /* ENABLE_JUSTIFY */
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     /* If we don't have an alternative spell checker after reading the
      * command line and/or rcfile(s), check $SPELL for one, as Pico
      * does (unless we're using restricted mode, in which case spell
@@ -2491,7 +2486,7 @@ int main(int argc, char **argv)
     mouse_init();
 #endif
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     set_colorpairs();
 #else
     interface_color_pair[TITLE_BAR] = hilite_attribute;
@@ -2597,6 +2592,9 @@ int main(int argc, char **argv)
 #endif
 
     prepare_for_display();
+
+    if (rcfile_with_errors != NULL)
+	statusline(ALERT, _("Mistakes in '%s'"), rcfile_with_errors);
 
     while (TRUE) {
 #ifdef ENABLE_LINENUMBERS

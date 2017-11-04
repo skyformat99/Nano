@@ -43,7 +43,7 @@ extern bool as_an_at;
 extern int margin;
 extern int editwincols;
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 extern bool have_palette;
 #endif
 
@@ -83,7 +83,7 @@ extern int shiftaltup;
 extern int shiftaltdown;
 #endif
 
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
 extern ssize_t fill;
 extern ssize_t wrap_at;
 #endif
@@ -116,7 +116,7 @@ extern int whitespace_len[2];
 extern const char *exit_tag;
 extern const char *close_tag;
 extern const char *uncut_tag;
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 extern const char *unjust_tag;
 extern char *punct;
 extern char *brackets;
@@ -124,7 +124,7 @@ extern char *quotestr;
 extern regex_t quotereg;
 extern int quoterc;
 extern char *quoteerr;
-#endif /* !DISABLE_JUSTIFY */
+#endif /* !ENABLE_JUSTIFY */
 
 extern char *word_chars;
 
@@ -141,11 +141,11 @@ extern const char *locking_suffix;
 extern char *operating_dir;
 #endif
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 extern char *alt_speller;
 #endif
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 extern syntaxtype *syntaxes;
 extern char *syntaxstr;
 #endif
@@ -175,12 +175,14 @@ extern regex_t search_regexp;
 extern regmatch_t regmatches[10];
 
 extern int hilite_attribute;
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 extern char* specified_color_combo[NUMBER_OF_ELEMENTS];
 #endif
 extern int interface_color_pair[NUMBER_OF_ELEMENTS];
 
 extern char *homedir;
+extern char *statedir;
+extern char *rcfile_with_errors;
 
 typedef void (*functionptrtype)(void);
 
@@ -226,7 +228,7 @@ char *mbrevstrcasestr(const char *haystack, const char *needle,
 	const char *index);
 size_t mbstrlen(const char *s);
 size_t mbstrnlen(const char *s, size_t maxlen);
-#if !defined(NANO_TINY) || !defined(DISABLE_JUSTIFY)
+#if !defined(NANO_TINY) || defined(ENABLE_JUSTIFY)
 char *mbstrchr(const char *s, const char *c);
 #endif
 #ifndef NANO_TINY
@@ -234,7 +236,7 @@ char *mbstrpbrk(const char *s, const char *accept);
 char *revstrpbrk(const char *head, const char *accept, const char *index);
 char *mbrevstrpbrk(const char *head, const char *accept, const char *index);
 #endif
-#if defined(ENABLE_NANORC) && (!defined(NANO_TINY) || !defined(DISABLE_JUSTIFY))
+#if defined(ENABLE_NANORC) && (!defined(NANO_TINY) || defined(ENABLE_JUSTIFY))
 bool has_blank_mbchars(const char *s);
 #endif
 #ifdef ENABLE_UTF8
@@ -245,7 +247,7 @@ bool is_valid_mbstring(const char *s);
 #endif
 
 /* Most functions in color.c. */
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 void set_colorpairs(void);
 void color_init(void);
 void color_update(void);
@@ -271,7 +273,7 @@ void do_uncut_text(void);
 /* Most functions in files.c. */
 void initialize_buffer_text(void);
 bool open_buffer(const char *filename, bool undoable);
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 void replace_buffer(const char *filename);
 #ifndef NANO_TINY
 void replace_marked_buffer(const char *filename, filestruct *top, size_t top_x,
@@ -330,7 +332,7 @@ int keycode_from_string(const char *keystring);
 void assign_keyinfo(sc *s, const char *keystring, const int keycode);
 void print_sclist(void);
 void shortcut_init(void);
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 void set_lint_or_format_shortcuts(void);
 void set_spell_shortcuts(void);
 #endif
@@ -364,7 +366,7 @@ void get_history_newer_void(void);
 #ifdef ENABLE_TABCOMP
 char *get_history_completion(filestruct **h, char *s, size_t len);
 #endif
-bool have_dotnano(void);
+bool have_statedir(void);
 void load_history(void);
 void save_history(void);
 void load_poshistory(void);
@@ -378,7 +380,7 @@ void do_first_line(void);
 void do_last_line(void);
 void do_page_up(void);
 void do_page_down(void);
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 void do_para_begin(bool update_screen);
 void do_para_end(bool update_screen);
 void do_para_begin_void(void);
@@ -483,7 +485,7 @@ int do_yesno_prompt(bool all, const char *msg);
 
 /* Most functions in rcfile.c. */
 #ifdef ENABLE_NANORC
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 bool parse_color_names(char *combostr, short *fg, short *bg, bool *bright);
 void grab_and_store(const char *kind, char *ptr, regexlisttype **storage);
 #endif
@@ -551,13 +553,13 @@ void update_undo(undo_type action);
 void wrap_reset(void);
 bool do_wrap(filestruct *line);
 #endif
-#if defined(ENABLE_HELP) || !defined(DISABLE_WRAPJUSTIFY)
+#if defined(ENABLE_HELP) || defined(ENABLED_WRAPORJUSTIFY)
 ssize_t break_line(const char *line, ssize_t goal, bool snap_at_nl);
 #endif
-#if !defined(NANO_TINY) || !defined(DISABLE_JUSTIFY)
+#if !defined(NANO_TINY) || defined(ENABLE_JUSTIFY)
 size_t indent_length(const char *line);
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 void justify_format(filestruct *paragraph, size_t skip);
 bool begpar(const filestruct *const foo);
 bool inpar(const filestruct *const foo);
@@ -565,10 +567,10 @@ void do_justify(bool full_justify);
 void do_justify_void(void);
 void do_full_justify(void);
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 void do_spell(void);
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 void do_linter(void);
 void do_formatter(void);
 #endif
@@ -580,6 +582,7 @@ void complete_a_word(void);
 
 /* All functions in utils.c. */
 void get_homedir(void);
+char *concatenate(const char *path, const char *name);
 #ifdef ENABLE_LINENUMBERS
 int digits(ssize_t n);
 #endif
@@ -590,7 +593,7 @@ void null_at(char **data, size_t index);
 void unsunder(char *str, size_t true_len);
 void sunder(char *str);
 const char *fixbounds(const char *r);
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 bool is_separate_word(size_t position, size_t length, const char *buf);
 #endif
 const char *strstrwrapper(const char *haystack, const char *needle,
@@ -691,7 +694,7 @@ void spotlight_softwrapped(bool active, size_t from_col, size_t to_col);
 void do_suspend_void(void);
 void disable_waiting(void);
 void enable_waiting(void);
-#ifndef DISABLE_EXTRA
+#ifdef ENABLE_EXTRA
 void do_credits(void);
 #endif
 

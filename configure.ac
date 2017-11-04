@@ -75,6 +75,15 @@ fi
 
 AC_ARG_ENABLE(color,
 AS_HELP_STRING([--disable-color], [Disable color and syntax highlighting]))
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_color" = xyes; then
+	if test "x$enable_nanorc" != xyes; then
+	    AC_MSG_ERROR([--enable-color needs --enable-nanorc to work])
+	fi
+    else
+	enable_color=no
+    fi
+fi
 if test "x$enable_nanorc" = xno; then
     if test "x$enable_color" = xyes; then
 	AC_MSG_ERROR([--enable-color cannot work with --disable-nanorc])
@@ -83,9 +92,8 @@ if test "x$enable_nanorc" = xno; then
 	enable_color=no
     fi
 fi
-if test "x$enable_color" = xno; then
-    AC_DEFINE(DISABLE_COLOR, 1, [Define this to disable syntax highlighting.])
-else
+if test "x$enable_color" != xno; then
+    AC_DEFINE(ENABLE_COLOR, 1, [Define this to have syntax highlighting.])
     color_support=yes
 fi
 
@@ -104,8 +112,13 @@ fi
 
 AC_ARG_ENABLE(extra,
 AS_HELP_STRING([--disable-extra], [Disable the Easter egg]))
-if test "x$enable_extra" = xno; then
-    AC_DEFINE(DISABLE_EXTRA, 1, [Define this to disable extra stuff.])
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_extra" != xyes; then
+	enable_extra=no
+    fi
+fi
+if test "x$enable_extra" != xno; then
+    AC_DEFINE(ENABLE_EXTRA, 1, [Define this to have an Easter egg.])
 fi
 
 AC_ARG_ENABLE(help,
@@ -144,8 +157,13 @@ fi
 
 AC_ARG_ENABLE(justify,
 AS_HELP_STRING([--disable-justify], [Disable the justify/unjustify functions]))
-if test "x$enable_justify" = xno; then
-    AC_DEFINE(DISABLE_JUSTIFY, 1, [Define this to disable the justify routines.])
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_justify" != xyes; then
+	enable_justify=no
+    fi
+fi
+if test "x$enable_justify" != xno; then
+    AC_DEFINE(ENABLE_JUSTIFY, 1, [Define this to have the routines for justifying.])
 fi
 
 AC_ARG_ENABLE(libmagic,
@@ -209,8 +227,13 @@ fi
 
 AC_ARG_ENABLE(speller,
 AS_HELP_STRING([--disable-speller], [Disable the spell-checker functions]))
-if test "x$enable_speller" = xno; then
-    AC_DEFINE(DISABLE_SPELLER, 1, [Define this to disable the spell-checker functions.])
+if test "x$enable_tiny" = xyes; then
+    if test "x$enable_speller" != xyes; then
+	enable_speller=no
+    fi
+fi
+if test "x$enable_speller" != xno; then
+    AC_DEFINE(ENABLE_SPELLER, 1, [Define this to have the spell-checker functions.])
 fi
 
 AC_ARG_ENABLE(tabcomp,
@@ -266,25 +289,8 @@ AC_ARG_ENABLE(tiny,
 AS_HELP_STRING([--enable-tiny], [Disable features for the sake of size]))
 if test "x$enable_tiny" = xyes; then
     AC_DEFINE(NANO_TINY, 1, [Define this to make the nano executable as small as possible.])
-    if test "x$enable_color" != xyes; then
-	AC_DEFINE(DISABLE_COLOR, 1, [Define this to disable syntax highlighting.])
-	color_support=no
-    else
-	if test "x$enable_nanorc" != xyes; then
-	    AC_MSG_ERROR([--enable-color needs --enable-nanorc to work])
-	fi
-    fi
-    if test "x$enable_extra" != xyes; then
-	AC_DEFINE(DISABLE_EXTRA, 1, [Define this to disable extra stuff.])
-    fi
-    if test "x$enable_justify" != xyes; then
-	AC_DEFINE(DISABLE_JUSTIFY, 1, [Define this to disable the justify routines.])
-    fi
     if test "x$enable_libmagic" != xyes; then
 	enable_libmagic=no
-    fi
-    if test "x$enable_speller" != xyes; then
-	AC_DEFINE(DISABLE_SPELLER, 1, [Define this to disable the spell-checker functions.])
     fi
 fi
 

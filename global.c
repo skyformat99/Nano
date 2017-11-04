@@ -51,7 +51,7 @@ int margin = 0;
 int editwincols = -1;
 	/* The number of usable columns in the edit window: COLS - margin. */
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 bool have_palette = FALSE;
 	/* Whether the colors for the current syntax have been initialized. */
 #endif
@@ -84,7 +84,7 @@ int altleft, altright, altup, altdown;
 int shiftaltleft, shiftaltright, shiftaltup, shiftaltdown;
 #endif
 
-#ifndef DISABLE_WRAPJUSTIFY
+#ifdef ENABLED_WRAPORJUSTIFY
 ssize_t fill = 0;
 	/* The column where we will wrap lines. */
 ssize_t wrap_at = -CHARS_FROM_EOL;
@@ -135,7 +135,7 @@ int whitespace_len[2];
 	/* The length in bytes of these characters. */
 #endif
 
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 char *punct = NULL;
 	/* The closing punctuation that can end sentences. */
 char *brackets = NULL;
@@ -149,7 +149,7 @@ int quoterc;
 	/* Whether it was compiled successfully. */
 char *quoteerr = NULL;
 	/* The error message, if it didn't. */
-#endif /* !DISABLE_JUSTIFY */
+#endif
 
 char *word_chars = NULL;
 	/* Nonalphanumeric characters that also form words. */
@@ -174,12 +174,12 @@ char *operating_dir = NULL;
 	/* The path to our confining "operating" directory, when given. */
 #endif
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 char *alt_speller = NULL;
 	/* The command to use for the alternate spell checker. */
 #endif
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 syntaxtype *syntaxes = NULL;
 	/* The global list of color syntaxes. */
 char *syntaxstr = NULL;
@@ -233,7 +233,7 @@ regmatch_t regmatches[10];
 
 int hilite_attribute = A_REVERSE;
 	/* The curses attribute we use to highlight something. */
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 char* specified_color_combo[] = {NULL};
 	/* The color combinations as specified in the rcfile. */
 #endif
@@ -242,6 +242,10 @@ int interface_color_pair[] = {0};
 
 char *homedir = NULL;
 	/* The user's home directory, from $HOME or /etc/passwd. */
+char *statedir = NULL;
+	/* The directory for nano's history files. */
+char *rcfile_with_errors = NULL;
+	/* The first nanorc file, if any, that produced warnings. */
 
 
 /* Return the number of entries in the shortcut list for a given menu. */
@@ -493,7 +497,7 @@ void print_sclist(void)
 const char *exit_tag = N_("Exit");
 const char *close_tag = N_("Close");
 const char *uncut_tag = N_("Uncut Text");
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 const char *unjust_tag = N_("Unjustify");
 #endif
 
@@ -508,7 +512,7 @@ void shortcut_init(void)
     const char *nextline_tag = N_("Next Line");
     const char *prevpage_tag = N_("Prev Page");
     const char *nextpage_tag = N_("Next Page");
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     const char *justify_tag = N_("Justify");
     const char *fulljustify_tag = N_("FullJstify");
 #endif
@@ -553,7 +557,7 @@ void shortcut_init(void)
     const char *uncut_gist =
 	N_("Uncut from the cutbuffer into the current line");
     const char *cursorpos_gist = N_("Display the position of the cursor");
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     const char *spell_gist = N_("Invoke the spell checker, if available");
 #endif
     const char *replace_gist = N_("Replace a string or a regular expression");
@@ -578,7 +582,7 @@ void shortcut_init(void)
     const char *end_gist = N_("Go to end of current line");
     const char *prevblock_gist = N_("Go to previous block of text");
     const char *nextblock_gist = N_("Go to next block of text");
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     const char *parabegin_gist =
 	N_("Go to beginning of paragraph; then of previous paragraph");
     const char *paraend_gist =
@@ -611,7 +615,7 @@ void shortcut_init(void)
     const char *cuttilleof_gist =
 	N_("Cut from the cursor position to the end of the file");
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     const char *justify_gist = N_("Justify the current paragraph");
     const char *fulljustify_gist = N_("Justify the entire file");
 #endif
@@ -670,11 +674,11 @@ void shortcut_init(void)
     const char *forwardfile_gist = N_("Go to the next file in the list");
     const char *gotodir_gist = N_("Go to directory");
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     const char *lint_gist = N_("Invoke the linter, if available");
     const char *prevlint_gist = N_("Go to previous linter msg");
     const char *nextlint_gist = N_("Go to next linter msg");
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     const char *formatter_gist = N_("Invoke formatter, if available");
 #endif
 #endif
@@ -708,7 +712,7 @@ void shortcut_init(void)
     add_to_funcs(do_writeout_void, MMAIN,
 	N_("Write Out"), WITHORSANS(writeout_gist), TOGETHER, NOVIEW);
 
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     if (!ISSET(RESTRICTED)) {
 #else
     /* If we can't replace Insert with Justify, show Insert anyway, to
@@ -725,7 +729,7 @@ void shortcut_init(void)
 		NOVIEW);
 #endif
     } else {
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	add_to_funcs(do_justify_void, MMAIN,
 		justify_tag, WITHORSANS(justify_gist), BLANKAFTER, NOVIEW);
 #endif
@@ -770,19 +774,19 @@ void shortcut_init(void)
     uncutfunc = tailfunc;
 
     if (!ISSET(RESTRICTED)) {
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
 	add_to_funcs(do_justify_void, MMAIN,
 		justify_tag, WITHORSANS(justify_gist), TOGETHER, NOVIEW);
 #endif
 
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	add_to_funcs(do_spell, MMAIN,
 		N_("To Spell"), WITHORSANS(spell_gist), TOGETHER, NOVIEW);
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	add_to_funcs(do_linter, MMAIN,
 		N_("To Linter"), WITHORSANS(lint_gist), TOGETHER, NOVIEW);
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	add_to_funcs(do_formatter, MMAIN,
 		N_("Formatter"), WITHORSANS(formatter_gist), BLANKAFTER, NOVIEW);
 #endif
@@ -792,8 +796,8 @@ void shortcut_init(void)
     add_to_funcs(do_cursorpos_void, MMAIN,
 	N_("Cur Pos"), WITHORSANS(cursorpos_gist), TOGETHER, VIEW);
 
-#if (!defined(DISABLE_JUSTIFY) && (!defined(DISABLE_SPELLER) || !defined(DISABLE_COLOR)) || \
-	defined(DISABLE_JUSTIFY) && defined(DISABLE_SPELLER) && defined(DISABLE_COLOR))
+#if (defined(ENABLE_JUSTIFY) && (defined(ENABLE_SPELLER) || defined(ENABLE_COLOR)) || \
+	!defined(ENABLE_JUSTIFY) && !defined(ENABLE_SPELLER) && !defined(ENABLE_COLOR))
     /* Conditionally placing this one here or further on, to keep the
      * help items nicely paired in most conditions. */
     add_to_funcs(do_gotolinecolumn_void, MMAIN,
@@ -825,7 +829,7 @@ void shortcut_init(void)
     add_to_funcs(flip_replace, MREPLACE,
 	N_("No Replace"), WITHORSANS(whereis_gist), BLANKAFTER, VIEW);
 
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_funcs(do_full_justify, MWHEREIS,
 	fulljustify_tag, WITHORSANS(fulljustify_gist), TOGETHER, NOVIEW);
 
@@ -882,7 +886,7 @@ void shortcut_init(void)
 	N_("Prev Block"), WITHORSANS(prevblock_gist), TOGETHER, VIEW);
     add_to_funcs(do_next_block, MMAIN,
 	N_("Next Block"), WITHORSANS(nextblock_gist), TOGETHER, VIEW);
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_funcs(do_para_begin_void, MMAIN|MWHEREIS,
 	N_("Beg of Par"), WITHORSANS(parabegin_gist), TOGETHER, VIEW);
     add_to_funcs(do_para_end_void, MMAIN|MWHEREIS,
@@ -906,8 +910,8 @@ void shortcut_init(void)
 	N_("Next File"), WITHORSANS(nextfile_gist), BLANKAFTER, VIEW);
 #endif
 
-#if (defined(DISABLE_JUSTIFY) && (!defined(DISABLE_SPELLER) || !defined(DISABLE_COLOR)) || \
-	!defined(DISABLE_JUSTIFY) && defined(DISABLE_SPELLER) && defined(DISABLE_COLOR))
+#if (!defined(ENABLE_JUSTIFY) && (defined(ENABLE_SPELLER) || defined(ENABLE_COLOR)) || \
+	defined(ENABLE_JUSTIFY) && !defined(ENABLE_SPELLER) && !defined(ENABLE_COLOR))
     add_to_funcs(do_gotolinecolumn_void, MMAIN,
 	gotoline_tag, WITHORSANS(gotoline_gist), BLANKAFTER, VIEW);
 #endif
@@ -944,7 +948,7 @@ void shortcut_init(void)
 	N_("CutTillEnd"), WITHORSANS(cuttilleof_gist), BLANKAFTER, NOVIEW);
 #endif
 
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_funcs(do_full_justify, MMAIN,
 	fulljustify_tag, WITHORSANS(fulljustify_gist), TOGETHER, NOVIEW);
 #endif
@@ -999,7 +1003,7 @@ void shortcut_init(void)
 	N_("NextHstory"), WITHORSANS(nexthistory_gist), BLANKAFTER, VIEW);
 #endif
 
-#ifdef DISABLE_JUSTIFY
+#ifndef ENABLE_JUSTIFY
     add_to_funcs(do_gotolinecolumn_void, MWHEREIS,
 	gotoline_tag, WITHORSANS(gotoline_gist), BLANKAFTER, VIEW);
 #endif
@@ -1072,7 +1076,7 @@ void shortcut_init(void)
     add_to_funcs(discard_buffer, MWRITEFILE,
 	N_("Discard buffer"), WITHORSANS(discardbuffer_gist), BLANKAFTER, NOVIEW);
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     add_to_funcs(do_page_up, MLINTER,
 	/* TRANSLATORS: Try to keep the next two strings at most 20 characters. */
 	N_("Prev Lint Msg"), WITHORSANS(prevlint_gist), TOGETHER, VIEW);
@@ -1102,15 +1106,15 @@ void shortcut_init(void)
     add_to_sclist(MMOST, "F9", 0, do_cut_text_void, 0);
     add_to_sclist(MMOST, "^U", 0, do_uncut_text, 0);
     add_to_sclist(MMOST, "F10", 0, do_uncut_text, 0);
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_sclist(MMAIN, "^J", 0, do_justify_void, 0);
     add_to_sclist(MMAIN, "F4", 0, do_justify_void, 0);
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     add_to_sclist(MMAIN, "^T", 0, do_spell, 0);
     add_to_sclist(MMAIN, "F12", 0, do_spell, 0);
 #else
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     add_to_sclist(MMAIN, "^T", 0, do_linter, 0);
     add_to_sclist(MMAIN, "F12", 0, do_linter, 0);
 #endif
@@ -1204,7 +1208,7 @@ void shortcut_init(void)
     }
     add_to_sclist(MMAIN, "M-7", 0, do_prev_block, 0);
     add_to_sclist(MMAIN, "M-8", 0, do_next_block, 0);
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_sclist(MMAIN, "M-(", 0, do_para_begin_void, 0);
     add_to_sclist(MMAIN, "M-9", 0, do_para_begin_void, 0);
     add_to_sclist(MMAIN, "M-)", 0, do_para_end_void, 0);
@@ -1227,7 +1231,7 @@ void shortcut_init(void)
     add_to_sclist(MMAIN, "M-T", 0, do_cut_till_eof, 0);
     add_to_sclist(MMAIN, "M-D", 0, do_wordlinechar_count, 0);
 #endif
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_sclist(MMAIN|MWHEREIS, "M-J", 0, do_full_justify, 0);
 #endif
     add_to_sclist(MMAIN|MHELP, "^L", 0, total_refresh, 0);
@@ -1244,7 +1248,7 @@ void shortcut_init(void)
     add_to_sclist(MMAIN, "M-#", 0, do_toggle_void, LINE_NUMBERS);
 #endif
     add_to_sclist(MMAIN, "M-P", 0, do_toggle_void, WHITESPACE_DISPLAY);
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     add_to_sclist(MMAIN, "M-Y", 0, do_toggle_void, NO_COLOR_SYNTAX);
 #endif
 
@@ -1277,7 +1281,7 @@ void shortcut_init(void)
     add_to_sclist(MWHEREIS|MREPLACE, "^R", 0, flip_replace, 0);
     add_to_sclist(MWHEREIS|MREPLACE|MREPLACEWITH|MGOTOLINE|MFINDINHELP, "^Y", 0, do_first_line, 0);
     add_to_sclist(MWHEREIS|MREPLACE|MREPLACEWITH|MGOTOLINE|MFINDINHELP, "^V", 0, do_last_line, 0);
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     add_to_sclist(MWHEREIS|MREPLACE|MREPLACEWITH, "^W", 0, do_para_begin_void, 0);
     add_to_sclist(MWHEREIS|MREPLACE|MREPLACEWITH, "^O", 0, do_para_end_void, 0);
 #endif
@@ -1362,10 +1366,10 @@ void shortcut_init(void)
 #endif
 }
 
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 void set_lint_or_format_shortcuts(void)
 {
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     if (openfile->syntax->formatter) {
 	replace_scs_for(do_spell, do_formatter);
 	replace_scs_for(do_linter, do_formatter);
@@ -1378,12 +1382,12 @@ void set_lint_or_format_shortcuts(void)
 
 void set_spell_shortcuts(void)
 {
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
 	replace_scs_for(do_formatter, do_spell);
 	replace_scs_for(do_linter, do_spell);
 #endif
 }
-#endif /* !DISABLE_COLOR */
+#endif /* ENABLE_COLOR */
 
 const subnfunc *sctofunc(const sc *s)
 {
@@ -1502,12 +1506,12 @@ sc *strtosc(const char *input)
     else if (!strcasecmp(input, "mark"))
 	s->scfunc = do_mark;
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     else if (!strcasecmp(input, "tospell") ||
 	     !strcasecmp(input, "speller"))
 	s->scfunc = do_spell;
 #endif
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     else if (!strcasecmp(input, "linter"))
 	s->scfunc = do_linter;
 #endif
@@ -1516,7 +1520,7 @@ sc *strtosc(const char *input)
 	s->scfunc = do_cursorpos_void;
     else if (!strcasecmp(input, "gotoline"))
 	s->scfunc = do_gotolinecolumn_void;
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     else if (!strcasecmp(input, "justify"))
 	s->scfunc = do_justify_void;
     else if (!strcasecmp(input, "fulljustify"))
@@ -1677,7 +1681,7 @@ sc *strtosc(const char *input)
 	    s->toggle = SOFTWRAP;
 	else if (!strcasecmp(input, "whitespacedisplay"))
 	    s->toggle = WHITESPACE_DISPLAY;
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
 	else if (!strcasecmp(input, "nosyntax"))
 	    s->toggle = NO_COLOR_SYNTAX;
 #endif
@@ -1744,7 +1748,7 @@ int strtomenu(const char *input)
     else if (!strcasecmp(input, "help"))
 	return MHELP;
 #endif
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     else if (!strcasecmp(input, "spell"))
 	return MSPELL;
 #endif
@@ -1777,7 +1781,7 @@ void thanks_for_all_the_fish(void)
     delwin(bottomwin);
 
     free(word_chars);
-#ifndef DISABLE_JUSTIFY
+#ifdef ENABLE_JUSTIFY
     free(quotestr);
     regfree(&quotereg);
     free(quoteerr);
@@ -1791,7 +1795,7 @@ void thanks_for_all_the_fish(void)
     free(answer);
     free(last_search);
     free(present_path);
-#ifndef DISABLE_SPELLER
+#ifdef ENABLE_SPELLER
     free(alt_speller);
 #endif
     free_filestruct(cutbuffer);
@@ -1801,7 +1805,7 @@ void thanks_for_all_the_fish(void)
 	delete_opennode(openfile->prev);
     }
     delete_opennode(openfile);
-#ifndef DISABLE_COLOR
+#ifdef ENABLE_COLOR
     free(syntaxstr);
     while (syntaxes != NULL) {
 	syntaxtype *sint = syntaxes;
@@ -1848,7 +1852,7 @@ void thanks_for_all_the_fish(void)
 
 	free(sint);
     }
-#endif /* !DISABLE_COLOR */
+#endif /* ENABLE_COLOR */
 #ifdef ENABLE_HISTORIES
     /* Free the search, replace, and execute history lists. */
     free_filestruct(searchtop);
