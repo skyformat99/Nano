@@ -253,7 +253,7 @@ bool have_statedir(void)
     if (homedir != NULL) {
 	statedir = concatenate(homedir, "/.nano/");
 
-	if (stat(statedir, &dirstat) != 0 && S_ISDIR(dirstat.st_mode))
+	if (stat(statedir, &dirstat) == 0 && S_ISDIR(dirstat.st_mode))
 	    return TRUE;
     }
 
@@ -472,8 +472,8 @@ void save_poshistory(void)
 	    /* Assume 20 decimal positions each for line and column number,
 	     * plus two spaces, plus the line feed, plus the null byte. */
 	    path_and_place = charalloc(strlen(posptr->filename) + 44);
-	    sprintf(path_and_place, "%s %ld %ld\n", posptr->filename,
-			(long)posptr->lineno, (long)posptr->xno);
+	    sprintf(path_and_place, "%s %zd %zd\n",
+			posptr->filename, posptr->lineno, posptr->xno);
 	    length = strlen(path_and_place);
 
 	    /* Encode newlines in filenames as nulls. */
